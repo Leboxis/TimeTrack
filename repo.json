@@ -1,0 +1,26 @@
+{
+  "name": "Wellbeing",
+  "identifier": "com.leboxis.wellbeing.source",
+  "sourceURL": "https://raw.githubusercontent.com/Leboxis/TimeTrack/main/repo.json",
+  "iconURL": "https://github.com/Leboxis/TimeTrack/releases/download/latest/icon.png",
+  "website": "https://github.com/Leboxis/TimeTrack",
+  "subtitle": "Chronomètre, journal et tendances, entièrement sur l’appareil.",
+  "apps": [
+    {
+      "name": "Wellbeing",
+      "bundleIdentifier": "com.leboxis.wellbeingtracker",
+      "developerName": "Leboxis",
+      "subtitle": "Chronomètre, journal et tendances, entièrement sur l’appareil.",
+      "localizedDescription": "Journal personnel de suivi des séances : chronomètre, saisie, recherche, graphiques et export CSV. Stockage local, sans compte ni serveur.",
+      "iconURL": "https://github.com/Leboxis/TimeTrack/releases/download/latest/icon.png",
+      "versions": [
+        {
+          "version": "0",
+          "date": "1970-01-01T00:00:00Z",
+          "downloadURL": "https://github.com/Leboxis/TimeTrack/releases/download/latest/Wellbeing.ipa",
+          "size": 0
+        }
+      ]
+    }
+  ]
+}

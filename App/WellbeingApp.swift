@@ -25,6 +25,7 @@ struct RootView: View {
             TimerView().tabItem { Label("Séance", systemImage: "timer") }
             JournalView().tabItem { Label("Journal", systemImage: "book.closed") }
             TrendsView().tabItem { Label("Tendances", systemImage: "chart.xyaxis.line") }
+            MethodListView().tabItem { Label("Méthode", systemImage: "text.book.closed") }
             SettingsView().tabItem { Label("Réglages", systemImage: "gearshape") }
         }
         .overlay {
