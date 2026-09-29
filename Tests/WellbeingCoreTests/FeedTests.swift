@@ -67,4 +67,30 @@ final class FeedTests: XCTestCase {
             "https://www.reddit.com/comments/1wlhnh1.json?raw_json=1&limit=1")
         XCTAssertNil(GalleryFeed.commentsJSONURL(feedID: "t3_!!!"))
     }
+
+    func testHTTPErrorCarriesStatusCode() {
+        XCTAssertTrue(FeedError.http(401).errorDescription?.contains("401") == true)
+    }
+
+    func testGalleryKeepsItemsWithoutStatus() throws {
+        let json = """
+        [{"kind":"Listing","data":{"children":[{"kind":"t3","data":{
+          "gallery_data":{"items":[{"media_id":"abc"}]},
+          "media_metadata":{"abc":{"m":"image/jpg","s":{"u":"https://preview.redd.it/abc.jpg?auto=webp"}}}
+        }}]}}]
+        """
+        let media = try GalleryFeed.parse(Data(json.utf8))
+        XCTAssertEqual(media, [.direct(URL(string: "https://i.redd.it/abc.jpg")!)])
+    }
+
+    func testGalleryKeepsGifWithOnlyU() throws {
+        let json = """
+        [{"kind":"Listing","data":{"children":[{"kind":"t3","data":{
+          "gallery_data":{"items":[{"media_id":"abc"}]},
+          "media_metadata":{"abc":{"m":"image/gif","s":{"u":"https://preview.redd.it/abc.gif?auto=webp"}}}
+        }}]}}]
+        """
+        let media = try GalleryFeed.parse(Data(json.utf8))
+        XCTAssertEqual(media, [.direct(URL(string: "https://i.redd.it/abc.gif")!)])
+    }
 }
