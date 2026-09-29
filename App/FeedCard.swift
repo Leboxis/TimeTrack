@@ -18,7 +18,8 @@ struct FeedCard: View {
     @State private var thumb: UIImage?
     @State private var image: UIImage?
     @State private var videoURL: URL?
-    @State private var gallery: [URL]?
+    @State private var gallery: [Media]?
+    @State private var galleryIndex = 0
     @State private var failed = false
 
     static func isVideo(_ url: URL) -> Bool {
@@ -29,14 +30,15 @@ struct FeedCard: View {
         ZStack(alignment: .bottomLeading) {
             Color.black
             if let videoURL {
-                AutoPlayVideo(url: videoURL, active: isActive)
+                AutoPlayVideo(url: videoURL, active: isActive) { failed = true }
             } else if let image {
                 Image(uiImage: image).resizable().scaledToFit()
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if let gallery {
-                TabView {
-                    ForEach(gallery, id: \.self) { url in
-                        GalleryImage(url: url, model: model)
+                TabView(selection: $galleryIndex) {
+                    ForEach(Array(gallery.enumerated()), id: \.offset) { position, item in
+                        GalleryPage(media: item, active: isActive && position == galleryIndex, model: model)
+                            .tag(position)
                     }
                 }
                 .tabViewStyle(.page(indexDisplayMode: .automatic))
@@ -49,8 +51,13 @@ struct FeedCard: View {
                         }
                     }
             } else if failed {
-                ContentUnavailableView("Média indisponible", systemImage: "photo")
-                    .foregroundStyle(.white)
+                VStack(spacing: 16) {
+                    ContentUnavailableView("Média indisponible", systemImage: "photo")
+                        .foregroundStyle(.white)
+                    Button("Réessayer") { Task { await retry() } }
+                        .buttonStyle(.borderedProminent).tint(.white)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 ProgressView().tint(.white)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -89,9 +96,9 @@ struct FeedCard: View {
             case .redgifs(let id):
                 videoURL = try await model.redgifsStreamURL(id: id)
             case nil:
-                let urls = try await model.galleryImageURLs(feedID: entry.post.id)
-                guard !urls.isEmpty else { throw FeedError.invalidFeed }
-                gallery = urls
+                let items = try await model.galleryMedia(feedID: entry.post.id)
+                guard !items.isEmpty else { throw FeedError.invalidFeed }
+                gallery = items
             }
         } catch is CancellationError {
             // The card scrolled away; a newer task owns the state now.
@@ -99,25 +106,59 @@ struct FeedCard: View {
             if !Task.isCancelled { failed = true }
         }
     }
+
+    private func retry() async {
+        failed = false
+        gallery = nil
+        image = nil
+        videoURL = nil
+        await load()
+    }
 }
 
-private struct GalleryImage: View {
-    let url: URL
+private struct GalleryPage: View {
+    let media: Media
+    let active: Bool
     let model: FeedModel
     @State private var image: UIImage?
+    @State private var failed = false
 
     var body: some View {
         Group {
-            if let image {
-                Image(uiImage: image).resizable().scaledToFit()
-            } else {
-                ProgressView().tint(.white)
+            switch media {
+            case .direct(let url):
+                if let image {
+                    Image(uiImage: image).resizable().scaledToFit()
+                } else if failed {
+                    VStack(spacing: 12) {
+                        Image(systemName: "photo").font(.largeTitle).foregroundStyle(.white.opacity(0.6))
+                        Button("Réessayer") { Task { await load(url: url) } }
+                            .buttonStyle(.bordered).tint(.white)
+                    }
+                } else {
+                    ProgressView().tint(.white)
+                }
+            case .redditVideo(let base):
+                AutoPlayVideo(url: base.appending(path: "HLSPlaylist.m3u8"), active: active)
+            case .redgifs:
+                // Unreachable: GalleryFeed.parse only emits direct and redditVideo.
+                ContentUnavailableView("Média indisponible", systemImage: "photo")
+                    .foregroundStyle(.white)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color.black)
         .task {
-            image = try? await model.loadImage(url, maxPixels: 2048)
+            if case .direct(let url) = media { await load(url: url) }
+        }
+    }
+
+    private func load(url: URL) async {
+        failed = false
+        if let image = try? await model.loadImage(url, maxPixels: 2048), !Task.isCancelled {
+            self.image = image
+        } else if !Task.isCancelled {
+            failed = true
         }
     }
 }

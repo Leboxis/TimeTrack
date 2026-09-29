@@ -21,8 +21,10 @@ final class FeedModel {
 
     private var redgifsToken: String?
     private var redgifsTokenDate = Date.distantPast
-    private var resolvedCache: [String: [URL]] = [:]
+    private var resolvedURLCache: [String: URL] = [:]
+    private var resolvedMediaCache: [String: [Media]] = [:]
     private var loadTask: Task<Void, Never>?
+    private var loadGeneration = 0
 
     init() {
         let saved = UserDefaults.standard.string(forKey: Self.subredditKey) ?? "feet"
@@ -40,23 +42,32 @@ final class FeedModel {
     }
 
     private func fetch() async {
+        loadGeneration &+= 1
+        let mine = loadGeneration
         loading = true
         errorMessage = nil
-        defer { loading = false }
+        defer { if loadGeneration == mine { loading = false } }
         do {
             let name = try subredditName(subreddit)
             let (data, response) = try await get(feedURL(subreddit: name))
             try Task.checkCancellation()
+            guard loadGeneration == mine else { return }
             guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
                 throw FeedError.invalidFeed
             }
-            posts = try FeedParser.parse(data)
+            let parsed = try FeedParser.parse(data)
+            guard loadGeneration == mine else { return }
+            posts = parsed
         } catch is CancellationError {
             // Superseded by a newer load; leave the previous posts in place.
+        } catch let urlError as URLError where urlError.code == .cancelled {
+            // The URLSession task died with its parent task. Same as above.
         } catch let urlError as URLError {
+            guard loadGeneration == mine else { return }
             posts = []
             errorMessage = offlineMessage(for: urlError)
         } catch {
+            guard loadGeneration == mine else { return }
             posts = []
             errorMessage = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
         }
@@ -81,9 +92,8 @@ final class FeedModel {
 
     private func checked(_ url: URL, headers: [String: String] = [:]) async throws -> Data {
         let (data, response) = try await get(url, headers: headers)
-        guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
-            throw FeedError.invalidFeed
-        }
+        guard let http = response as? HTTPURLResponse else { throw FeedError.invalidFeed }
+        guard (200...299).contains(http.statusCode) else { throw FeedError.http(http.statusCode) }
         return data
     }
 
@@ -101,17 +111,14 @@ final class FeedModel {
         return UIImage(cgImage: cg)
     }
 
-    /// Playable URLs for one gallery post. Gallery videos are dropped: carousels
-    /// here are overwhelmingly images, and a mixed pager would need the full player.
-    func galleryImageURLs(feedID: String) async throws -> [URL] {
-        if let cached = resolvedCache[feedID] { return cached }
+    /// Playable media for one gallery post, in carousel order: images and videos.
+    /// `GalleryFeed.parse` only ever emits those two cases.
+    func galleryMedia(feedID: String) async throws -> [Media] {
+        if let cached = resolvedMediaCache[feedID] { return cached }
         guard let url = GalleryFeed.commentsJSONURL(feedID: feedID) else { throw FeedError.invalidFeed }
-        let urls = try GalleryFeed.parse(try await checked(url)).compactMap { media -> URL? in
-            if case .direct(let url) = media { return url }
-            return nil
-        }
-        resolvedCache[feedID] = urls
-        return urls
+        let media = try GalleryFeed.parse(try await checked(url))
+        resolvedMediaCache[feedID] = media
+        return media
     }
 
     private func token() async throws -> String {
@@ -125,7 +132,7 @@ final class FeedModel {
     }
 
     func redgifsStreamURL(id: String) async throws -> URL {
-        if let cached = resolvedCache["redgifs:" + id]?.first { return cached }
+        if let cached = resolvedURLCache["redgifs:" + id] { return cached }
         struct Response: Decodable {
             struct Gif: Decodable {
                 struct URLs: Decodable { let hd: URL?; let sd: URL? }
@@ -146,13 +153,14 @@ final class FeedModel {
         }
         do {
             let url = try await attempt()
-            resolvedCache["redgifs:" + id] = [url]
+            resolvedURLCache["redgifs:" + id] = url
             return url
-        } catch {
-            // The token may have expired mid-session: drop it once and retry once.
+        } catch FeedError.http(401) {
+            // The token expired mid-session: drop it once and retry once.
+            // Any other error is surfaced as-is, without churning a valid token.
             redgifsToken = nil
             let url = try await attempt()
-            resolvedCache["redgifs:" + id] = [url]
+            resolvedURLCache["redgifs:" + id] = url
             return url
         }
     }

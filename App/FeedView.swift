@@ -79,6 +79,13 @@ struct FeedView: View {
                             .background(.ultraThinMaterial, in: Capsule())
                     }
                     Spacer()
+                    Button { model.load() } label: {
+                        Label("Actualiser", systemImage: "arrow.clockwise")
+                            .labelStyle(.iconOnly)
+                            .font(.subheadline.weight(.semibold))
+                            .padding(.horizontal, 14).padding(.vertical, 8)
+                            .background(.ultraThinMaterial, in: Capsule())
+                    }
                     if model.loading {
                         ProgressView().tint(.white)
                             .padding(.horizontal, 14).padding(.vertical, 8)

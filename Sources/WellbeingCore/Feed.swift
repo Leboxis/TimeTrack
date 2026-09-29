@@ -28,13 +28,15 @@ public enum Media: Hashable, Sendable {
 }
 
 public enum FeedError: LocalizedError {
-    case invalidFeed, invalidSubreddit
+    case invalidFeed, invalidSubreddit, http(Int)
     public var errorDescription: String? {
         switch self {
         case .invalidFeed:
             return "Réponse RSS invalide : Reddit peut refuser cet accès anonyme."
         case .invalidSubreddit:
             return "Subreddit invalide (2 à 21 lettres, chiffres ou underscores, ex. r/feet)."
+        case .http(let code):
+            return "Accès refusé par le serveur (HTTP \(code))."
         }
     }
 }
@@ -193,7 +195,7 @@ public enum GalleryFeed {
         for item in items {
             guard let id = item["media_id"] as? String,
                   let meta = metadata[id] as? [String: Any],
-                  (meta["status"] as? String) == "valid" else { continue }
+                  (meta["status"] as? String ?? "valid") == "valid" else { continue }
             let mime = ((meta["m"] as? String) ?? "").lowercased()
             let kind = meta["e"] as? String
             let s = meta["s"] as? [String: Any]
@@ -206,9 +208,8 @@ public enum GalleryFeed {
                     media = .redditVideo(base)
                 }
             } else if let ext = extByMime[mime] {
-                let sourceKey = ext == "gif" ? "gif" : "u"
-                if let raw = s?[sourceKey] as? String,
-                   var components = URLComponents(string: raw),
+                let raw = ((s?["u"] as? String) ?? (s?["gif"] as? String)) ?? ""
+                if var components = URLComponents(string: raw),
                    components.scheme == "https",
                    ["preview.redd.it", "i.redd.it"].contains(components.host?.lowercased()) {
                     components.query = nil
