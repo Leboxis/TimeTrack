@@ -104,7 +104,11 @@ final class JournalTests: XCTestCase {
     }
 
     func testRoundTripsTheNewFields() throws {
-        let session = Session(duration: 42, feeling: 4, orgasm: 5, mental: 2, ejaculation: .jet, notes: "Net")
+        // Whole-second date: the ISO8601 encoder drops sub-second precision, so a
+        // `Date()` default would make this compare unequal for a reason unrelated
+        // to the new fields.
+        let session = Session(date: Date(timeIntervalSince1970: 100), duration: 42, feeling: 4,
+                              orgasm: 5, mental: 2, ejaculation: .jet, notes: "Net")
         let decoded = try Journal.decode(Journal.encode([session]))
         XCTAssertEqual(decoded, [session])
     }
@@ -132,7 +136,7 @@ final class JournalTests: XCTestCase {
     func testCSVQuotesNewlinesAndNeutralizesFormulas() {
         let csv = Journal.csv([Session(duration: 12, notes: " =SUM(1,2)\n\"note\"")])
         XCTAssertTrue(csv.contains("\"' =SUM(1,2)\n\"\"note\"\"\""))
-        XCTAssertTrue(csv.hasPrefix("date_utc,duree_secondes,ressenti_sur_5,notes\r\n"))
+        XCTAssertTrue(csv.hasPrefix("date_utc,duree_secondes,ressenti_sur_5,orgasme_sur_5,ressenti_mental_sur_5,type_ejaculation,notes\r\n"))
     }
 
     func testTimerResumesAfterSerializationAndExcludesPausedTime() throws {

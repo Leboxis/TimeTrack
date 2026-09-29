@@ -1,24 +1,58 @@
 import Foundation
 
+public enum Ejaculation: String, Codable, CaseIterable {
+    case aucune, baveuse, jet
+
+    public var label: String {
+        switch self {
+        case .aucune: return "Aucune"
+        case .baveuse: return "Baveuse"
+        case .jet: return "Jet"
+        }
+    }
+}
+
 public struct Session: Identifiable, Codable, Equatable {
     public var id: UUID
     public var date: Date
     public var duration: TimeInterval
     public var feeling: Int
+    public var orgasm: Int
+    public var mental: Int
+    public var ejaculation: Ejaculation
     public var notes: String
 
     public init(id: UUID = UUID(), date: Date = Date(), duration: TimeInterval,
-                feeling: Int = 3, notes: String = "") {
+                feeling: Int = 3, orgasm: Int = 3, mental: Int = 3,
+                ejaculation: Ejaculation = .aucune, notes: String = "") {
         self.id = id
         self.date = date
         self.duration = duration
         self.feeling = feeling
+        self.orgasm = orgasm
+        self.mental = mental
+        self.ejaculation = ejaculation
         self.notes = notes
+    }
+
+    /// Hand-written so a journal written before 1.4.0, which has no `orgasm`, `mental`
+    /// or `ejaculation` key, still decodes instead of failing the whole file.
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        date = try container.decode(Date.self, forKey: .date)
+        duration = try container.decode(TimeInterval.self, forKey: .duration)
+        feeling = try container.decode(Int.self, forKey: .feeling)
+        orgasm = try container.decodeIfPresent(Int.self, forKey: .orgasm) ?? 3
+        mental = try container.decodeIfPresent(Int.self, forKey: .mental) ?? 3
+        ejaculation = try container.decodeIfPresent(Ejaculation.self, forKey: .ejaculation) ?? .aucune
+        notes = try container.decode(String.self, forKey: .notes)
     }
 
     public var isValid: Bool {
         duration.isFinite && duration >= 1 && duration <= 86_400
-            && (1...5).contains(feeling) && notes.count <= 10_000
+            && (1...5).contains(feeling) && (1...5).contains(orgasm) && (1...5).contains(mental)
+            && notes.count <= 10_000
             && date.timeIntervalSince1970.isFinite
     }
 }
@@ -76,9 +110,11 @@ public enum Journal {
         let formatter = ISO8601DateFormatter()
         let rows = sessions.sorted { $0.date < $1.date }.map { session in
             [formatter.string(from: session.date), String(session.duration),
-             String(session.feeling), safeCSVField(session.notes)].joined(separator: ",")
+             String(session.feeling), String(session.orgasm), String(session.mental),
+             session.ejaculation.rawValue,
+             safeCSVField(session.notes)].joined(separator: ",")
         }
-        return "date_utc,duree_secondes,ressenti_sur_5,notes\r\n" + rows.joined(separator: "\r\n")
+        return "date_utc,duree_secondes,ressenti_sur_5,orgasme_sur_5,ressenti_mental_sur_5,type_ejaculation,notes\r\n" + rows.joined(separator: "\r\n")
     }
 
     private static func safeCSVField(_ text: String) -> String {
