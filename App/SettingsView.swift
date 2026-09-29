@@ -80,7 +80,7 @@ struct SettingsView: View {
                 } footer: {
                     Text("Ta session Reddit est conservée dans le magasin de cookies du système, jamais dans les données de l’app. Elle donne accès à ton compte entier, pas seulement à la lecture. « Se déconnecter » l’efface.")
                 }
-                Section("Diagnostic du flux") {
+                Section {
                     ForEach(Array(diagnostics.lines.enumerated()), id: \.offset) { _, line in
                         Text(line)
                             .font(.caption2.monospaced())
@@ -90,6 +90,8 @@ struct SettingsView: View {
                     Button("Tester le flux maintenant") { probeFeed() }
                         .disabled(diagnostics.rateLimited())
                     Button("Effacer le journal de diagnostic", role: .destructive) { diagnostics.reset() }
+                } header: {
+                    Text("Diagnostic du flux")
                 } footer: {
                     Text("Journal des requêtes envoyées à Reddit : statut HTTP, présence du cookie de session et quota restant. Aucune valeur de cookie n’est écrite ici.")
                 }
