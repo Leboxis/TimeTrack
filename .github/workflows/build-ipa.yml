@@ -1,0 +1,81 @@
+name: Build iOS IPA
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ios-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Test and build IPA
+    runs-on: macos-15
+    timeout-minutes: 25
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_16.4.app/Contents/Developer
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Check toolchain
+        run: xcodebuild -version
+
+      - name: Test journal and timer
+        run: swift test
+
+      - name: Generate Xcode project and icon
+        run: |
+          brew install xcodegen
+          python3 scripts/make_icon.py
+          xcodegen generate
+
+      - name: Build for iPhone and iPad
+        run: |
+          set -o pipefail
+          xcodebuild \
+            -project Wellbeing.xcodeproj \
+            -scheme Wellbeing \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CURRENT_PROJECT_VERSION="$GITHUB_RUN_NUMBER" \
+            build | tee build.log
+
+      - name: Package unsigned IPA
+        run: |
+          mkdir -p output/Payload
+          cp -R build/Build/Products/Release-iphoneos/Wellbeing.app output/Payload/
+          cd output
+          /usr/bin/zip -qry Wellbeing.ipa Payload
+          shasum -a 256 Wellbeing.ipa > Wellbeing.ipa.sha256
+
+      - name: Validate IPA contents
+        run: python3 scripts/verify_ipa.py output/Wellbeing.ipa
+
+      - name: Upload IPA
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: Wellbeing-IPA
+          path: |
+            output/Wellbeing.ipa
+            output/Wellbeing.ipa.sha256
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload build log on failure
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: build-log
+          path: build.log
+          if-no-files-found: ignore
