@@ -27,6 +27,10 @@ struct SessionEditor: View {
         return updated.isValid
     }
 
+    static let feelingLabels = ["Difficile", "Mitigé", "Neutre", "Bien", "Très bien"]
+    static let orgasmLabels = ["Difficile", "Faible", "Correct", "Bon", "Excellent"]
+    static let mentalLabels = ["Anxieux", "Agité", "Neutre", "Apaisé", "Serein"]
+
     var body: some View {
         NavigationStack {
             Form {
@@ -43,14 +47,20 @@ struct SessionEditor: View {
                     }
                 }
                 Section {
-                    Picker("Ressenti", selection: $session.feeling) {
-                        Text("1 · Difficile").tag(1)
-                        Text("2 · Mitigé").tag(2)
-                        Text("3 · Neutre").tag(3)
-                        Text("4 · Bien").tag(4)
-                        Text("5 · Très bien").tag(5)
+                    RatingRow(title: "Ressenti", labels: Self.feelingLabels, value: $session.feeling)
+                    RatingRow(title: "Orgasme", labels: Self.orgasmLabels, value: $session.orgasm)
+                    RatingRow(title: "Mental", labels: Self.mentalLabels, value: $session.mental)
+                } header: {
+                    Text("Comment vous sentez-vous ?")
+                }
+                Section {
+                    Picker("Type d’éjaculation", selection: $session.ejaculation) {
+                        ForEach(Ejaculation.allCases, id: \.self) { option in
+                            Text(option.label).tag(option)
+                        }
                     }
-                } header: { Text("Comment vous sentez-vous ?") }
+                    .pickerStyle(.segmented)
+                }
                 Section("Notes personnelles") {
                     TextField("Contexte, énergie, ressenti…", text: $session.notes, axis: .vertical)
                         .lineLimit(4...12)

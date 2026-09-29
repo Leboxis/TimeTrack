@@ -45,8 +45,14 @@ struct JournalView: View {
                             HStack {
                                 Text(session.date, format: .dateTime.hour().minute())
                                 Spacer()
-                                Label("Ressenti \(session.feeling)/5", systemImage: "heart")
+                                Label("\(session.feeling)/5", systemImage: "heart")
                             }.font(.caption).foregroundStyle(.secondary)
+                            HStack(spacing: 6) {
+                                chip("Ressenti \(session.feeling)/5")
+                                chip("Orgasme \(session.orgasm)/5")
+                                chip("Mental \(session.mental)/5")
+                                chip(session.ejaculation.label)
+                            }
                             if !session.notes.isEmpty {
                                 Text(session.notes).font(.subheadline).foregroundStyle(.secondary).lineLimit(2)
                             }
@@ -83,5 +89,12 @@ struct JournalView: View {
                 Button("Annuler", role: .cancel) { deleting = nil }
             } message: { Text("Cette action est définitive.") }
         }
+    }
+
+    private func chip(_ text: String) -> some View {
+        Text(text)
+            .font(.caption2.weight(.medium))
+            .padding(.horizontal, 7).padding(.vertical, 3)
+            .background(Color.teal.opacity(0.12), in: Capsule())
     }
 }
