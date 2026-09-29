@@ -36,6 +36,21 @@ enum MethodCatalog {
                 "Stimulation réduite : uniquement du lubrifiant et un doigt sur la zone la plus sensible. Ne jamais revenir à la masturbation habituelle, cela réhabituerait à davantage de stimulation."
             ],
             cadence: "Trois séances au minimum sur trois jours différents pour la référence, puis aussi régulièrement que possible."
+        ),
+        PracticeMethod(
+            id: "coach-sarah",
+            title: "Méthode Coach Sarah",
+            summary: "Dix niveaux progressifs pour jouir plus vite. On trouve son niveau, puis on travaille vers le suivant : d’abord le temps, ensuite le visuel, enfin le physique.",
+            steps: [
+                "Principe : votre niveau est le plus élevé dont vous remplissez TOUS les critères. Travaillez vers le suivant dans l’ordre : A. Temps, B. Visuel, C. Physique.",
+                "Niveaux 1-3 : descendre à un jour sur deux ou 3 fois par semaine. Maximum hebdomadaire × 0,9 chaque semaine. Remplacer au moins la moitié du temps libéré par marche ou exercice.",
+                "Temps (niveau 4+) : chronométrer chaque séance, moyenne × 0,9 = temps maximum. Minuteur réglé sur le maximum ; sans orgasme, arrêter et attendre la prochaine séance.",
+                "Visuel : garder le temps maximum, basculer sur le contenu moins stimulant au moment de l’orgasme, puis de plus en plus tôt dans la séance.",
+                "Physique : même principe avec une prise de moins en moins intense. En cas de plateau, recommencer le cycle ou rallonger le temps maximum.",
+                "Échelle des temps : moins de 5 min (4), 90 s (5), 60 s (6), 45 s (7), 30 s (8), 20 s (9), 10 s sans visuel, un seul doigt (10).",
+                "Échelles : visuel n’importe quoi, puis une personne sans pénétration, sous-vêtements, vêtements de ville, rien. Physique : prise normale, 3 doigts, 2 doigts, 1 doigt."
+            ],
+            cadence: "3 fois par semaine ou un jour sur deux, jamais davantage à partir du niveau 4."
         )
     ]
 }
