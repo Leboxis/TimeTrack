@@ -48,6 +48,8 @@ struct SettingsView: View {
                     .disabled(store.sessions.isEmpty)
                     Text("L’export contient vos notes personnelles. Choisissez un emplacement qui vous convient.")
                         .font(.footnote).foregroundStyle(.secondary)
+                    Text("Les séances enregistrées avant la version 1.4.0 affichent 3/5 pour le ressenti de l’orgasme et le ressenti mental, et « Aucune » pour le type d’éjaculation. Ouvrez-les pour les corriger.")
+                        .font(.footnote).foregroundStyle(.secondary)
                 }
                 Section("Confidentialité") {
                     Label("Sans compte, publicité ni suivi", systemImage: "person.crop.circle.badge.checkmark")
