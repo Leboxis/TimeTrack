@@ -56,11 +56,9 @@ final class RedditSession {
     /// Narrower than the reference, which wipes all website data. Only the cookies go.
     func logout() async {
         clearing = true
-        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
-            store.httpCookieStore.getAllCookies { cookies in
-                self.store.httpCookieStore.delete(cookies) {
-                    self.store.httpCookieStore.setCookies([]) { continuation.resume() }
-                }
+        for cookie in await allCookies() {
+            await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+                store.httpCookieStore.delete(cookie) { continuation.resume() }
             }
         }
         hasSession = false
