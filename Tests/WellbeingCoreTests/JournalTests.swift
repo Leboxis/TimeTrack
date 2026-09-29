@@ -41,7 +41,7 @@ final class JournalTests: XCTestCase {
     }
 
     func testRecoveryKeepsReadableRecordsWhenStrictDecodingFails() throws {
-        let keeper = Session(duration: 42, notes: "Intacte")
+        let keeper = Session(date: Date(timeIntervalSince1970: 100), duration: 42, notes: "Intacte")
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601
         let encoded = try encoder.encode([keeper])
