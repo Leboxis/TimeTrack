@@ -1,37 +1,34 @@
 import SwiftUI
 
-/// One 1-5 scale as a row of buttons. Used for every rating the editor collects.
+/// One 1-5 scale as a single button that opens the choices, so the editor stays short.
 struct RatingRow: View {
     let title: String
     let labels: [String]
     @Binding var value: Int
 
+    private var current: String {
+        let index = min(max(value, 1), labels.count) - 1
+        return "\(value)/5 · \(labels[index])"
+    }
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Text(title)
-                Spacer()
-                Text("\(min(max(value, 1), labels.count))/5")
-                    .foregroundStyle(.secondary).monospacedDigit()
-            }
-            HStack(spacing: 8) {
-                ForEach(Array(labels.enumerated()), id: \.offset) { index, label in
-                    let score = index + 1
-                    Button {
-                        value = score
-                    } label: {
-                        Text(label)
-                            .font(.caption.weight(score <= value ? .semibold : .regular))
-                            .lineLimit(2)
-                            .frame(maxWidth: .infinity, minHeight: 44)
+        HStack {
+            Text(title)
+            Spacer()
+            Menu {
+                Picker(title, selection: $value) {
+                    ForEach(Array(labels.enumerated()), id: \.offset) { index, label in
+                        Text("\(index + 1) · \(label)").tag(index + 1)
                     }
-                    .buttonStyle(.plain)
-                    .background(score <= value ? Color.teal.opacity(0.18) : Color(.tertiarySystemFill),
-                                in: RoundedRectangle(cornerRadius: 10))
-                    .foregroundStyle(score <= value ? Color.primary : Color.secondary)
-                    .accessibilityLabel("\(title) : \(label)")
-                    .accessibilityAddTraits(score <= value ? [.isSelected, .isButton] : .isButton)
                 }
+            } label: {
+                HStack(spacing: 6) {
+                    Text(current).monospacedDigit().foregroundStyle(.primary)
+                    Image(systemName: "chevron.up.chevron.down")
+                        .font(.caption2).foregroundStyle(.secondary)
+                }
+                .frame(minHeight: 44)
+                .contentShape(Rectangle())
             }
         }
     }

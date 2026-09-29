@@ -21,6 +21,8 @@ struct SettingsView: View {
     @State private var document = CSVDocument(text: "")
     @State private var confirmErase = false
     @State private var confirmReset = false
+    @State private var reddit = RedditSession.shared
+    @State private var loginPresented = false
 
     var body: some View {
         NavigationStack {
@@ -51,9 +53,28 @@ struct SettingsView: View {
                     Text("Les séances enregistrées avant la version 1.4.0 affichent 3/5 pour le ressenti de l’orgasme et le ressenti mental, et « Aucune » pour le type d’éjaculation. Ouvrez-les pour les corriger.")
                         .font(.footnote).foregroundStyle(.secondary)
                 }
+                Section {
+                    Label(reddit.hasSession ? "Session Reddit détectée" :
+                          reddit.expired ? "Session expirée" : "Reddit · sans session",
+                          systemImage: reddit.hasSession ? "checkmark.shield.fill" : "person.crop.circle.badge.questionmark")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(reddit.hasSession ? Color.green : Color.secondary)
+                    Button(reddit.hasSession ? "Ouvrir Reddit" : "Se connecter à Reddit") {
+                        loginPresented = true
+                    }
+                    .disabled(reddit.clearing)
+                    Button("Se déconnecter de Reddit", role: .destructive) {
+                        Task { await reddit.logout() }
+                    }
+                    .disabled(!reddit.hasSession || reddit.clearing)
+                } header: {
+                    Text("Reddit")
+                } footer: {
+                    Text("Ta session Reddit est conservée dans le magasin de cookies du système, jamais dans les données de l’app. Elle donne accès à ton compte entier, pas seulement à la lecture. « Se déconnecter » l’efface.")
+                }
                 Section("Confidentialité") {
                     Label("Journal local, sans compte ni suivi", systemImage: "person.crop.circle.badge.checkmark")
-                    Text("Le journal reste dans son espace local et peut être inclus dans les sauvegardes de votre appareil. Exportez-le avant de désinstaller l’app ou son conteneur. Seul le flux RSS contacte Reddit pour afficher son contenu public.")
+                    Text("Le journal reste dans son espace local et peut être inclus dans les sauvegardes de votre appareil. Exportez-le avant de désinstaller l’app ou son conteneur. Seul le flux RSS contacte Reddit, avec ta session si elle est connectée.")
                         .font(.footnote).foregroundStyle(.secondary)
                 }
                 Section {
@@ -83,6 +104,7 @@ struct SettingsView: View {
             } message: {
                 Text("Le fichier local sera remplacé par un journal vide. Les \(store.sessions.count) séance(s) récupérée(s) seront perdues : exportez-les d’abord.")
             }
+            .fullScreenCover(isPresented: $loginPresented) { RedditLoginView() }
         }
     }
 }

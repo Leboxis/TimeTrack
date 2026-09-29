@@ -7,28 +7,20 @@ struct MethodListView: View {
         NavigationStack {
             List {
                 Section {
-                    HStack(spacing: 10) {
-                        NavigationLink {
-                            FeedView()
-                        } label: {
-                            Label("Flux", systemImage: "play.rectangle")
-                                .frame(maxWidth: .infinity)
-                        }
-                        .buttonStyle(.bordered)
-                        NavigationLink {
-                            MediaLibraryView()
-                        } label: {
-                            Label("Médias", systemImage: "play.circle")
-                                .frame(maxWidth: .infinity)
-                        }
-                        .buttonStyle(.bordered)
-                        NavigationLink {
-                            GalleryPickerView()
-                        } label: {
-                            Label("Galeries", systemImage: "photo.on.rectangle")
-                                .frame(maxWidth: .infinity)
-                        }
-                        .buttonStyle(.bordered)
+                    NavigationLink {
+                        FeedView()
+                    } label: {
+                        Label("Flux", systemImage: "play.rectangle")
+                    }
+                    NavigationLink {
+                        MediaLibraryView()
+                    } label: {
+                        Label("Médias", systemImage: "play.circle")
+                    }
+                    NavigationLink {
+                        GalleryPickerView()
+                    } label: {
+                        Label("Galeries", systemImage: "photo.on.rectangle")
                     }
                 }
                 if methods.isEmpty {

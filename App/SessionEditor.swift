@@ -57,9 +57,9 @@ struct SessionEditor: View {
                     Picker("Type d’éjaculation", selection: $session.ejaculation) {
                         ForEach(Ejaculation.allCases, id: \.self) { option in
                             Text(option.label).tag(option)
-                        }
                     }
-                    .pickerStyle(.segmented)
+                    .pickerStyle(.menu)
+                }
                 }
                 Section("Notes personnelles") {
                     TextField("Contexte, énergie, ressenti…", text: $session.notes, axis: .vertical)

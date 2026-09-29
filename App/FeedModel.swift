@@ -87,14 +87,53 @@ final class FeedModel {
         var request = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalAndRemoteCacheData)
         request.setValue(Self.userAgent, forHTTPHeaderField: "User-Agent")
         for (key, value) in headers { request.setValue(value, forHTTPHeaderField: key) }
-        return try await URLSession.shared.data(for: request)
+        if let cookie = await RedditSession.shared.cookieHeader(for: url) {
+            request.setValue(cookie, forHTTPHeaderField: "Cookie")
+        }
+        return try await session.data(for: request)
     }
+
+    /// URLSession copies headers onto the redirect request, so a 302 to a CDN would
+    /// replay the session cookie. Strip it and re-add it only for Reddit hosts.
+    private final class RedirectGuard: NSObject, URLSessionTaskDelegate {
+        func urlSession(_ session: URLSession, task: URLSessionTask,
+                        willPerformHTTPRedirection response: HTTPURLResponse,
+                        newRequest request: URLRequest,
+                        completionHandler: @escaping (URLRequest?) -> Void) {
+            var redirected = request
+            redirected.setValue(nil, forHTTPHeaderField: "Cookie")
+            if let url = request.url, RedditCookiePolicy.allows(url) {
+                Task { @MainActor in
+                    if let cookie = await RedditSession.shared.cookieHeader(for: url) {
+                        redirected.setValue(cookie, forHTTPHeaderField: "Cookie")
+                    }
+                    completionHandler(redirected)
+                }
+            } else {
+                completionHandler(redirected)
+            }
+        }
+    }
+
+    private let session: URLSession = {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.httpShouldSetCookies = false
+        configuration.httpCookieStorage = nil
+        configuration.urlCredentialStorage = nil
+        return URLSession(configuration: configuration, delegate: RedirectGuard(), delegateQueue: nil)
+    }()
 
     private func checked(_ url: URL, headers: [String: String] = [:]) async throws -> Data {
         let (data, response) = try await get(url, headers: headers)
-        guard let http = response as? HTTPURLResponse else { throw FeedError.invalidFeed }
-        guard (200...299).contains(http.statusCode) else { throw FeedError.http(http.statusCode) }
-        return data
+            guard let http = response as? HTTPURLResponse else { throw FeedError.invalidFeed }
+            if http.statusCode == 401 || http.statusCode == 403 {
+                // The cookie we believed was valid was refused: the reference keeps
+                // showing "session detected" here, which is the reported symptom.
+                RedditSession.shared.markExpired()
+                throw FeedError.http(http.statusCode)
+            }
+            guard (200...299).contains(http.statusCode) else { throw FeedError.http(http.statusCode) }
+            return data
     }
 
     func loadImage(_ url: URL, maxPixels: Int) async throws -> UIImage {
