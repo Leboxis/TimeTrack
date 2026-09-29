@@ -7,7 +7,7 @@ options:
 settings:
   base:
     SWIFT_VERSION: "5.0"
-    MARKETING_VERSION: "1.0.0"
+    MARKETING_VERSION: "1.1.0"
     CURRENT_PROJECT_VERSION: "1"
 packages:
   WellbeingCore:
@@ -31,6 +31,8 @@ targets:
       path: App/Info.plist
       properties:
         CFBundleDisplayName: Wellbeing
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         CFBundleDevelopmentRegion: fr
         CFBundleLocalizations: [fr]
         ITSAppUsesNonExemptEncryption: false

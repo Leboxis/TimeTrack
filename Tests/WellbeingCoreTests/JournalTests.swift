@@ -2,6 +2,23 @@ import XCTest
 @testable import WellbeingCore
 
 final class JournalTests: XCTestCase {
+    func testChartSelectionEmptySingleAndBetweenDates() {
+        let early = Session(date: Date(timeIntervalSince1970: 100), duration: 10)
+        let late = Session(date: Date(timeIntervalSince1970: 200), duration: 20)
+        XCTAssertNil(nearestSession(to: .now, in: []))
+        XCTAssertEqual(nearestSession(to: .distantFuture, in: [early])?.id, early.id)
+        XCTAssertEqual(nearestSession(to: Date(timeIntervalSince1970: 180), in: [early, late])?.id, late.id)
+        XCTAssertEqual(nearestSession(to: Date(timeIntervalSince1970: 150), in: [late, early])?.id, early.id)
+    }
+
+    func testChartSelectionTiedDatesHasStableIdentity() {
+        let date = Date(timeIntervalSince1970: 100)
+        let first = Session(id: UUID(uuidString: "00000000-0000-0000-0000-000000000001")!, date: date, duration: 10)
+        let second = Session(id: UUID(uuidString: "00000000-0000-0000-0000-000000000002")!, date: date, duration: 20)
+        XCTAssertEqual(nearestSession(to: date, in: [second, first])?.id, first.id)
+        XCTAssertEqual(nearestSession(to: date, in: [first, second])?.id, first.id)
+    }
+
     func testJournalRoundTripPreservesContentAndSortsNewestFirst() throws {
         let first = Session(date: Date(timeIntervalSince1970: 100), duration: 42, notes: "Calme, reposé")
         let second = Session(date: Date(timeIntervalSince1970: 200), duration: 75, feeling: 5)

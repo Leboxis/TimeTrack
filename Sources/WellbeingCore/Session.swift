@@ -86,3 +86,14 @@ public func durationLabel(_ seconds: TimeInterval) -> String {
     if total >= 3600 { return String(format: "%d:%02d:%02d", total / 3600, total / 60 % 60, total % 60) }
     return String(format: "%02d:%02d", total / 60, total % 60)
 }
+
+/// Resolve the chart's continuous date axis to a stable record, including tied dates.
+public func nearestSession(to date: Date, in sessions: [Session]) -> Session? {
+    sessions.min { left, right in
+        let leftDistance = abs(left.date.timeIntervalSince(date))
+        let rightDistance = abs(right.date.timeIntervalSince(date))
+        if leftDistance != rightDistance { return leftDistance < rightDistance }
+        if left.date != right.date { return left.date < right.date }
+        return left.id.uuidString < right.id.uuidString
+    }
+}

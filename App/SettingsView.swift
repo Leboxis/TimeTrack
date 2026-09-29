@@ -27,7 +27,7 @@ struct SettingsView: View {
                 Section {
                     Label("Wellbeing", systemImage: "leaf.fill").font(.title2).foregroundStyle(.teal)
                     Text("Votre journal personnel, simplement.").foregroundStyle(.secondary)
-                    LabeledContent("Version", value: "1.0.0")
+                    LabeledContent("Version", value: Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "—")
                 }
                 Section("Vos données") {
                     LabeledContent("Séances enregistrées", value: "\(store.sessions.count)")

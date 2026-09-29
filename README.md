@@ -9,6 +9,7 @@ Application native **SwiftUI**, en français, pour iPhone et iPad sous **iOS 17 
 - Date, durée, ressenti de 1 à 5 et notes personnelles.
 - Journal avec recherche et calendrier de filtrage.
 - Graphiques des durées et du ressenti sur 7 jours, 30 jours ou toute la période.
+- Graphiques interactifs : toucher ou glisser pour sélectionner une séance, repères synchronisés, fiche détaillée et modification directe. Navigation précédente/suivante pour parcourir tous les points, y compris les séances à la même heure.
 - Export CSV compatible avec les tableurs et suppression complète sur confirmation.
 - Stockage local, protection de fichier iOS et écran masqué lorsque l’app est inactive.
 - Interface adaptative, mode sombre système et contrôles SwiftUI accessibles.
@@ -61,6 +62,7 @@ Les tests couvrent la sérialisation du journal, les données invalides, les dou
 
 - Démarrer, mettre en pause, reprendre, fermer puis rouvrir l’app.
 - Enregistrer une séance, la modifier, filtrer le journal et contrôler les graphiques.
+- Toucher et parcourir les points des deux graphiques ; vérifier la fiche, les flèches, la remise à zéro de la sélection lors d’un changement de période et l’édition directe. Tester avec une seule séance et avec plusieurs séances à la même heure.
 - Exporter un CSV avec accents, guillemets et plusieurs lignes de notes.
 - Tester le mode sombre, les grandes tailles de texte et la rotation sur iPad.
 - Tester séparément l’import LiveContainer et la signature SideStore.
