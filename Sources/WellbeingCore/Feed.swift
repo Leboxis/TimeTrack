@@ -28,7 +28,7 @@ public enum Media: Hashable, Sendable {
 }
 
 public enum FeedError: LocalizedError {
-    case invalidFeed, invalidSubreddit, http(Int)
+    case invalidFeed, invalidSubreddit, http(Int), rateLimited
     public var errorDescription: String? {
         switch self {
         case .invalidFeed:
@@ -37,6 +37,8 @@ public enum FeedError: LocalizedError {
             return "Subreddit invalide (2 à 21 lettres, chiffres ou underscores, ex. r/feet)."
         case .http(let code):
             return "Accès refusé par le serveur (HTTP \(code))."
+        case .rateLimited:
+            return "Reddit limite les requêtes. Patiente quelques secondes puis réessaie."
         }
     }
 }

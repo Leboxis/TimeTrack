@@ -47,17 +47,29 @@ final class FeedModel {
         loading = true
         errorMessage = nil
         defer { if loadGeneration == mine { loading = false } }
+        if FeedDiagnostics.shared.rateLimited() {
+            errorMessage = "Reddit limite les requêtes. Patiente quelques secondes puis réessaie."
+            FeedDiagnostics.shared.record("requête ignorée : encore limited par Reddit")
+            return
+        }
         do {
             let name = try subredditName(subreddit)
+            await RedditSession.shared.refresh()
+            FeedDiagnostics.shared.record("GET r/\(name) — session Reddit : \(RedditSession.shared.hasSession ? "oui" : "non")")
             let (data, response) = try await get(feedURL(subreddit: name))
             try Task.checkCancellation()
             guard loadGeneration == mine else { return }
-            guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
-                throw FeedError.invalidFeed
+            guard let http = response as? HTTPURLResponse else { throw FeedError.invalidFeed }
+            if http.statusCode == 429 {
+                FeedDiagnostics.shared.cooldown(from: http.allHeaderFields)
+                FeedDiagnostics.shared.record("HTTP 429 — quota épuisé, reset dans \(http.value(forHTTPHeaderField: "x-ratelimit-reset") ?? "?") s")
+                throw FeedError.rateLimited
             }
+            guard (200...299).contains(http.statusCode) else { throw FeedError.http(http.statusCode) }
             let parsed = try FeedParser.parse(data)
             guard loadGeneration == mine else { return }
             posts = parsed
+            FeedDiagnostics.shared.record("OK — \(parsed.count) entrées")
         } catch is CancellationError {
             // Superseded by a newer load; leave the previous posts in place.
         } catch let urlError as URLError where urlError.code == .cancelled {
@@ -66,10 +78,12 @@ final class FeedModel {
             guard loadGeneration == mine else { return }
             posts = []
             errorMessage = offlineMessage(for: urlError)
+            FeedDiagnostics.shared.record("échec réseau : \(urlError.code.rawValue) \(urlError.localizedDescription)")
         } catch {
             guard loadGeneration == mine else { return }
             posts = []
             errorMessage = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+            if case FeedError.http(let code) = error { FeedDiagnostics.shared.record("échec HTTP \(code)") }
         }
     }
 
@@ -87,10 +101,24 @@ final class FeedModel {
         var request = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalAndRemoteCacheData)
         request.setValue(Self.userAgent, forHTTPHeaderField: "User-Agent")
         for (key, value) in headers { request.setValue(value, forHTTPHeaderField: key) }
-        if let cookie = await RedditSession.shared.cookieHeader(for: url) {
+        let cookie = await RedditSession.shared.cookieHeader(for: url)
+        if let cookie {
             request.setValue(cookie, forHTTPHeaderField: "Cookie")
+            if url.host?.hasSuffix("reddit.com") == true {
+                FeedDiagnostics.shared.record("cookie attaché : \(cookieNames(cookie).joined(separator: ", "))")
+            }
+        } else if url.host?.hasSuffix("reddit.com") == true {
+            FeedDiagnostics.shared.record("aucun cookie attaché")
         }
         return try await session.data(for: request)
+    }
+
+    /// Names only, never values: a session cookie must never reach a log the user reads.
+    private func cookieNames(_ header: String) -> [String] {
+        header.split(separator: ";").compactMap { pair in
+            let name = pair.split(separator: "=").first.map(String.init)?.trimmingCharacters(in: .whitespaces)
+            return (name?.isEmpty == false) ? name : nil
+        }
     }
 
     /// URLSession copies headers onto the redirect request, so a 302 to a CDN would

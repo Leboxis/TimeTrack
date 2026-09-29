@@ -22,7 +22,15 @@ struct SettingsView: View {
     @State private var confirmErase = false
     @State private var confirmReset = false
     @State private var reddit = RedditSession.shared
+    @State private var diagnostics = FeedDiagnostics.shared
     @State private var loginPresented = false
+
+    /// One throwaway request so the diagnostics panel shows something even when the
+    /// feed screen was never opened.
+    private func probeFeed() {
+        let model = FeedModel()
+        model.load()
+    }
 
     var body: some View {
         NavigationStack {
@@ -71,6 +79,19 @@ struct SettingsView: View {
                     Text("Reddit")
                 } footer: {
                     Text("Ta session Reddit est conservée dans le magasin de cookies du système, jamais dans les données de l’app. Elle donne accès à ton compte entier, pas seulement à la lecture. « Se déconnecter » l’efface.")
+                }
+                Section("Diagnostic du flux") {
+                    ForEach(Array(diagnostics.lines.enumerated()), id: \.offset) { _, line in
+                        Text(line)
+                            .font(.caption2.monospaced())
+                            .foregroundStyle(.secondary)
+                            .textSelection(.enabled)
+                    }
+                    Button("Tester le flux maintenant") { probeFeed() }
+                        .disabled(diagnostics.rateLimited())
+                    Button("Effacer le journal de diagnostic", role: .destructive) { diagnostics.reset() }
+                } footer: {
+                    Text("Journal des requêtes envoyées à Reddit : statut HTTP, présence du cookie de session et quota restant. Aucune valeur de cookie n’est écrite ici.")
                 }
                 Section("Confidentialité") {
                     Label("Journal local, sans compte ni suivi", systemImage: "person.crop.circle.badge.checkmark")
