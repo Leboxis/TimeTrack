@@ -1,5 +1,6 @@
 import ImageIO
 import SwiftUI
+import UIKit
 import WellbeingCore
 
 struct FeedEntry: Identifiable {

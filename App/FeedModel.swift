@@ -1,6 +1,7 @@
 import Foundation
 import ImageIO
 import Observation
+import UIKit
 import WellbeingCore
 
 /// Loads the feed and resolves playable media. Streaming only: nothing is saved,
