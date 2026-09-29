@@ -82,6 +82,53 @@ final class JournalTests: XCTestCase {
         XCTAssertEqual(result.rejected, 0)
     }
 
+    func testDecodesJournalWrittenBeforeTheNewFields() throws {
+        // Exactly the JSON shape a 1.3.0 build wrote: six keys, three missing.
+        let legacy = """
+        [{"id":"11111111-1111-1111-1111-111111111111","date":"2024-01-01T00:00:00Z","duration":42,"feeling":4,"notes":"Avant"}]
+        """
+        let sessions = try Journal.decode(Data(legacy.utf8))
+        XCTAssertEqual(sessions.count, 1)
+        XCTAssertEqual(sessions[0].orgasm, 3)
+        XCTAssertEqual(sessions[0].mental, 3)
+        XCTAssertEqual(sessions[0].ejaculation, .aucune)
+        XCTAssertEqual(sessions[0].notes, "Avant")
+    }
+
+    func testRejectsOutOfRangeNewScales() {
+        XCTAssertThrowsError(try Journal.encode([Session(duration: 10, orgasm: 0)]))
+        XCTAssertThrowsError(try Journal.encode([Session(duration: 10, orgasm: 6)]))
+        XCTAssertThrowsError(try Journal.encode([Session(duration: 10, mental: 0)]))
+        XCTAssertThrowsError(try Journal.encode([Session(duration: 10, mental: 6)]))
+        XCTAssertNoThrow(try Journal.encode([Session(duration: 10, orgasm: 1, mental: 5)]))
+    }
+
+    func testRoundTripsTheNewFields() throws {
+        let session = Session(duration: 42, feeling: 4, orgasm: 5, mental: 2, ejaculation: .jet, notes: "Net")
+        let decoded = try Journal.decode(Journal.encode([session]))
+        XCTAssertEqual(decoded, [session])
+    }
+
+    func testRecoveryKeepsLegacyRecordsAlongsideACorruptOne() throws {
+        let legacy = """
+        [{"id":"11111111-1111-1111-1111-111111111111","date":"2024-01-01T00:00:00Z","duration":42,"feeling":4,"notes":"Avant"},
+         {"id":"22222222-2222-2222-2222-222222222222","date":"2024-01-02T00:00:00Z","duration":99999,"feeling":3,"notes":"Hors limites"}]
+        """
+        XCTAssertThrowsError(try Journal.decode(Data(legacy.utf8)))
+        let recovered = Journal.decodeRecovering(Data(legacy.utf8))
+        XCTAssertEqual(recovered.sessions.count, 1)
+        XCTAssertEqual(recovered.sessions[0].orgasm, 3)
+        XCTAssertEqual(recovered.sessions[0].ejaculation, .aucune)
+        XCTAssertEqual(recovered.rejected, 1)
+    }
+
+    func testCSVExposesEveryMeasure() {
+        let csv = Journal.csv([Session(duration: 12, feeling: 4, orgasm: 5, mental: 2, ejaculation: .baveuse, notes: "Note")])
+        XCTAssertTrue(csv.hasPrefix("date_utc,duree_secondes,ressenti_sur_5,orgasme_sur_5,ressenti_mental_sur_5,type_ejaculation,notes\r\n"))
+        let row = csv.components(separatedBy: "\r\n")[1]
+        XCTAssertTrue(row.hasSuffix(",4,5,2,baveuse,\"Note\""))
+    }
+
     func testCSVQuotesNewlinesAndNeutralizesFormulas() {
         let csv = Journal.csv([Session(duration: 12, notes: " =SUM(1,2)\n\"note\"")])
         XCTAssertTrue(csv.contains("\"' =SUM(1,2)\n\"\"note\"\"\""))

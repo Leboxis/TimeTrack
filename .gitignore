@@ -12,3 +12,4 @@ App/Assets.xcassets/
 *.log
 __pycache__/
 .env
+.superpowers/
