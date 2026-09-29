@@ -1,8 +1,14 @@
 """Regenerate repo.json so SideStore and LiveContainer can install and update the app."""
 import json
 import os
+import plistlib
+import zipfile
 from datetime import datetime, timezone
 from pathlib import Path
+
+ipa = Path("Wellbeing.ipa")
+with zipfile.ZipFile(ipa) as archive:
+    info = plistlib.loads(archive.read("Payload/Wellbeing.app/Info.plist"))
 
 repository = os.environ["GITHUB_REPOSITORY"]
 tag = os.environ["RELEASE_TAG"]
@@ -32,10 +38,12 @@ manifest = {
             "iconURL": icon,
             "versions": [
                 {
-                    "version": os.environ["GITHUB_RUN_NUMBER"],
+                    "version": info["CFBundleShortVersionString"],
+                    "buildVersion": info["CFBundleVersion"],
                     "date": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
                     "downloadURL": release + "/Wellbeing.ipa",
-                    "size": Path("Wellbeing.ipa").stat().st_size,
+                    "size": ipa.stat().st_size,
+                    "minOSVersion": info["MinimumOSVersion"],
                 }
             ],
         }
@@ -45,4 +53,4 @@ manifest = {
 Path("repo.json").write_text(
     json.dumps(manifest, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
 )
-print("Wrote repo.json for build " + os.environ["GITHUB_RUN_NUMBER"])
+print("Wrote repo.json for {0} ({1})".format(info["CFBundleShortVersionString"], info["CFBundleVersion"]))

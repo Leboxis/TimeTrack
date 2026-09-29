@@ -112,12 +112,16 @@ jobs:
           set -euo pipefail
           cp artifact/Wellbeing.ipa artifact/Wellbeing.ipa.sha256 .
           cp App/Assets.xcassets/AppIcon.appiconset/AppIcon.png icon.png
-          gh release delete "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --yes --cleanup-tag || true
-          gh release create "$RELEASE_TAG" \
-            --repo "$GITHUB_REPOSITORY" \
-            --title "Wellbeing" \
-            --notes "Build ${GITHUB_RUN_NUMBER} — ${GITHUB_SHA}" \
-            Wellbeing.ipa Wellbeing.ipa.sha256 icon.png
+          notes="Build ${GITHUB_RUN_NUMBER} — ${GITHUB_SHA}"
+          if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --clobber \
+              Wellbeing.ipa Wellbeing.ipa.sha256 icon.png
+            gh release edit "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --notes "$notes"
+          else
+            gh release create "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" \
+              --title "Wellbeing" --notes "$notes" \
+              Wellbeing.ipa Wellbeing.ipa.sha256 icon.png
+          fi
 
       - name: Write repo.json
         run: python3 scripts/write_repo_json.py
@@ -133,4 +137,5 @@ jobs:
             exit 0
           fi
           git commit -m "chore: refresh repo.json for build ${GITHUB_RUN_NUMBER} [skip ci]"
+          git pull --rebase origin main
           git push
