@@ -15,10 +15,10 @@
       "iconURL": "https://github.com/Leboxis/TimeTrack/releases/download/latest/icon.png",
       "versions": [
         {
-          "version": "0",
-          "date": "1970-01-01T00:00:00Z",
+          "version": "3",
+          "date": "2026-09-29T17:41:55Z",
           "downloadURL": "https://github.com/Leboxis/TimeTrack/releases/download/latest/Wellbeing.ipa",
-          "size": 0
+          "size": 338341
         }
       ]
     }
