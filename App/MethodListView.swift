@@ -6,6 +6,31 @@ struct MethodListView: View {
     var body: some View {
         NavigationStack {
             List {
+                Section {
+                    HStack(spacing: 10) {
+                        NavigationLink {
+                            FeedView()
+                        } label: {
+                            Label("Flux", systemImage: "play.rectangle")
+                                .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(.bordered)
+                        NavigationLink {
+                            MediaLibraryView()
+                        } label: {
+                            Label("Médias", systemImage: "play.circle")
+                                .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(.bordered)
+                        NavigationLink {
+                            GalleryPickerView()
+                        } label: {
+                            Label("Galeries", systemImage: "photo.on.rectangle")
+                                .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(.bordered)
+                    }
+                }
                 if methods.isEmpty {
                     ContentUnavailableView("Aucune méthode", systemImage: "text.book.closed",
                         description: Text("Les méthodes ajoutées apparaîtront ici."))

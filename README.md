@@ -14,7 +14,7 @@ Application native **SwiftUI**, en français, pour iPhone et iPad sous **iOS 17 
 - Stockage local, protection de fichier iOS et écran masqué lorsque l’app est inactive.
 - Interface adaptative, mode sombre système et contrôles SwiftUI accessibles.
 
-Les notes ne sont jamais envoyées à GitHub. Aucun compte, serveur, service de suivi ou dépendance applicative tierce. Les sauvegardes système de l’appareil peuvent inclure les données. L’écran masqué n’est pas un verrou biométrique. Le chronomètre utilise l’heure système ; la modifier pendant une séance peut affecter sa durée.
+Les notes ne sont jamais envoyées à GitHub. Aucun compte ni service de suivi. Le flux RSS charge du contenu public depuis Reddit. Les sauvegardes système de l’appareil peuvent inclure les données. L’écran masqué n’est pas un verrou biométrique. Le chronomètre utilise l’heure système ; la modifier pendant une séance peut affecter sa durée.
 
 ## Télécharger l’IPA
 

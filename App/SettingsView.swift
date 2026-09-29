@@ -52,8 +52,8 @@ struct SettingsView: View {
                         .font(.footnote).foregroundStyle(.secondary)
                 }
                 Section("Confidentialité") {
-                    Label("Sans compte, publicité ni suivi", systemImage: "person.crop.circle.badge.checkmark")
-                    Text("L’app n’envoie aucune donnée à un serveur. Le journal reste dans son espace local et peut être inclus dans les sauvegardes de votre appareil. Exportez-le avant de désinstaller l’app ou son conteneur.")
+                    Label("Journal local, sans compte ni suivi", systemImage: "person.crop.circle.badge.checkmark")
+                    Text("Le journal reste dans son espace local et peut être inclus dans les sauvegardes de votre appareil. Exportez-le avant de désinstaller l’app ou son conteneur. Seul le flux RSS contacte Reddit pour afficher son contenu public.")
                         .font(.footnote).foregroundStyle(.secondary)
                 }
                 Section {
