@@ -20,6 +20,7 @@ struct SettingsView: View {
     @State private var exporting = false
     @State private var document = CSVDocument(text: "")
     @State private var confirmErase = false
+    @State private var confirmReset = false
 
     var body: some View {
         NavigationStack {
@@ -29,13 +30,22 @@ struct SettingsView: View {
                     Text("Votre journal personnel, simplement.").foregroundStyle(.secondary)
                     LabeledContent("Version", value: Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "—")
                 }
+                if store.loadFailed {
+                    Section {
+                        LoadFailureNotice()
+                    } header: {
+                        Text("Lecture partielle")
+                    } footer: {
+                        Text("Réinitialiser remplace définitivement le fichier local par un journal vide. Exportez d’abord si les séances récupérées vous intéressent.")
+                    }
+                }
                 Section("Vos données") {
                     LabeledContent("Séances enregistrées", value: "\(store.sessions.count)")
                     Button {
                         document = CSVDocument(text: Journal.csv(store.sessions))
                         exporting = true
                     } label: { Label("Exporter en CSV", systemImage: "square.and.arrow.up") }
-                    .disabled(store.sessions.isEmpty || store.loadFailed)
+                    .disabled(store.sessions.isEmpty)
                     Text("L’export contient vos notes personnelles. Choisissez un emplacement qui vous convient.")
                         .font(.footnote).foregroundStyle(.secondary)
                 }
@@ -45,6 +55,9 @@ struct SettingsView: View {
                         .font(.footnote).foregroundStyle(.secondary)
                 }
                 Section {
+                    if store.loadFailed {
+                        Button("Réinitialiser le journal local", role: .destructive) { confirmReset = true }
+                    }
                     Button("Effacer le journal et le chronomètre", role: .destructive) { confirmErase = true }
                         .disabled(store.loadFailed)
                 }
@@ -60,6 +73,14 @@ struct SettingsView: View {
                 }
                 Button("Annuler", role: .cancel) {}
             } message: { Text("Cette action est définitive. Exportez votre journal si vous souhaitez en conserver une copie.") }
+            .confirmationDialog("Réinitialiser le journal ?", isPresented: $confirmReset, titleVisibility: .visible) {
+                Button("Réinitialiser", role: .destructive) {
+                    if store.resetJournal() { timer.reset() }
+                }
+                Button("Annuler", role: .cancel) {}
+            } message: {
+                Text("Le fichier local sera remplacé par un journal vide. Les \(store.sessions.count) séance(s) récupérée(s) seront perdues : exportez-les d’abord.")
+            }
         }
     }
 }

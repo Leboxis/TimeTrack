@@ -7,6 +7,7 @@ struct TrendsView: View {
     @State private var days = 30
     @State private var selectedID: UUID?
     @State private var editing: Session?
+    @State private var showFullNotes = false
 
     private var sessions: [Session] {
         let cutoff = Calendar.current.date(byAdding: .day, value: -days, to: Date()) ?? .distantPast
@@ -29,9 +30,14 @@ struct TrendsView: View {
                         Text("30 jours").tag(30)
                         Text("Tout").tag(0)
                     }.pickerStyle(.segmented)
+                    if store.loadFailed {
+                        LoadFailureNotice()
+                    }
                     if sessions.isEmpty {
-                        ContentUnavailableView("Votre histoire commence ici", systemImage: "chart.xyaxis.line",
-                            description: Text("Les tendances apparaîtront après votre première séance."))
+                        if !store.loadFailed {
+                            ContentUnavailableView("Votre histoire commence ici", systemImage: "chart.xyaxis.line",
+                                description: Text("Les tendances apparaîtront après votre première séance."))
+                        }
                     } else {
                         HStack(spacing: 12) {
                             metric("Séances", value: "\(sessions.count)", symbol: "calendar")
@@ -49,11 +55,14 @@ struct TrendsView: View {
             }
             .navigationTitle("Tendances")
             .onChange(of: days) { _, _ in selectedID = nil }
+            .onChange(of: selectedID) { _, _ in showFullNotes = false }
             .onChange(of: sessions.map(\.id)) { _, ids in
                 if let selectedID, !ids.contains(selectedID) { self.selectedID = nil }
             }
             .sheet(item: $editing) { session in
-                SessionEditor(session: session) { store.save($0) }
+                SessionEditor(session: session, onSave: { store.save($0) }) {
+                    store.delete(session.id)
+                }
             }
         }
     }
@@ -78,7 +87,16 @@ struct TrendsView: View {
                     Label("\(selected.feeling)/5", systemImage: "heart")
                 }.foregroundStyle(.secondary)
                 Text(selected.notes.isEmpty ? "Aucune note pour cette séance." : selected.notes)
-                    .font(.subheadline).lineLimit(4)
+                    .font(.subheadline).lineLimit(showFullNotes ? nil : 4)
+                if !selected.notes.isEmpty {
+                    Button {
+                        showFullNotes.toggle()
+                    } label: {
+                        Label(showFullNotes ? "Réduire la note" : "Lire la note en entier",
+                              systemImage: showFullNotes ? "chevron.up" : "chevron.down")
+                            .font(.subheadline)
+                    }
+                }
                 Button { editing = selected } label: {
                     Label("Ouvrir / modifier la séance", systemImage: "square.and.pencil")
                 }.buttonStyle(.bordered)

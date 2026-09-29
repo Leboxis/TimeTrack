@@ -17,7 +17,6 @@ struct WellbeingApp: App {
 
 struct RootView: View {
     @Environment(JournalStore.self) private var store
-    @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
         @Bindable var store = store
@@ -28,14 +27,7 @@ struct RootView: View {
             MethodListView().tabItem { Label("Méthode", systemImage: "text.book.closed") }
             SettingsView().tabItem { Label("Réglages", systemImage: "gearshape") }
         }
-        .overlay {
-            if scenePhase != .active {
-                ZStack {
-                    Color(.systemBackground).ignoresSafeArea()
-                    Label("Wellbeing", systemImage: "leaf.fill").font(.largeTitle).foregroundStyle(.teal)
-                }
-            }
-        }
+        .privacyMask()
         .alert("Journal", isPresented: Binding(
             get: { store.errorMessage != nil },
             set: { if !$0 { store.errorMessage = nil } }

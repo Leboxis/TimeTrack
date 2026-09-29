@@ -26,7 +26,10 @@ struct JournalView: View {
                             .datePickerStyle(.graphical)
                     }
                 }
-                if filtered.isEmpty {
+                if store.loadFailed {
+                    LoadFailureNotice()
+                }
+                if filtered.isEmpty && !store.loadFailed {
                     ContentUnavailableView("Aucune séance", systemImage: "book.closed",
                         description: Text("Ajoutez une séance ou ajustez vos filtres."))
                 }
@@ -56,12 +59,19 @@ struct JournalView: View {
             }
             .navigationTitle("Journal")
             .searchable(text: $search, prompt: "Rechercher dans les notes")
+            .onChange(of: filterDay) { _, enabled in
+                // Start from the most recent session so enabling the filter never
+                // silently hides the whole history behind an empty day.
+                if enabled, let latest = store.sessions.first { selectedDay = latest.date }
+            }
             .toolbar {
                 Button { editing = Session(duration: 60) } label: { Label("Ajouter", systemImage: "plus") }
                     .disabled(store.loadFailed)
             }
             .sheet(item: $editing) { session in
-                SessionEditor(session: session) { store.save($0) }
+                SessionEditor(session: session, onSave: { store.save($0) }) {
+                    store.delete(session.id)
+                }
             }
             .alert("Supprimer cette séance ?", isPresented: Binding(
                 get: { deleting != nil }, set: { if !$0 { deleting = nil } }

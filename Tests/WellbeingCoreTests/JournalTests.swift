@@ -35,6 +35,53 @@ final class JournalTests: XCTestCase {
         XCTAssertThrowsError(try Journal.decode(Data("broken".utf8)))
     }
 
+    func testRejectsSubSecondDurations() throws {
+        XCTAssertThrowsError(try Journal.encode([Session(duration: 0.4)]))
+        XCTAssertNoThrow(try Journal.encode([Session(duration: 1)]))
+    }
+
+    func testRecoveryKeepsReadableRecordsWhenStrictDecodingFails() throws {
+        let keeper = Session(duration: 42, notes: "Intacte")
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        let encoded = try encoder.encode([keeper])
+        var objects = try XCTUnwrap(JSONSerialization.jsonObject(with: encoded) as? [[String: Any]])
+        let outOfRange: [String: Any] = [
+            "id": UUID().uuidString,
+            "date": "2024-01-01T00:00:00Z",
+            "duration": 99_999,
+            "feeling": 3,
+            "notes": "Hors limites"
+        ]
+        objects.append(outOfRange)
+        let data = try JSONSerialization.data(withJSONObject: objects)
+
+        XCTAssertThrowsError(try Journal.decode(data))
+        let recovered = Journal.decodeRecovering(data)
+        XCTAssertEqual(recovered.sessions, [keeper])
+        XCTAssertEqual(recovered.rejected, 1)
+    }
+
+    func testRecoveryDropsDuplicatesAndSortsNewestFirst() throws {
+        let older = Session(date: Date(timeIntervalSince1970: 100), duration: 10)
+        let newer = Session(date: Date(timeIntervalSince1970: 200), duration: 20)
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        let objects = try XCTUnwrap(JSONSerialization.jsonObject(
+            with: try encoder.encode([older, newer, newer])) as? [[String: Any]])
+        XCTAssertEqual(objects.count, 3)
+
+        let recovered = Journal.decodeRecovering(try JSONSerialization.data(withJSONObject: objects))
+        XCTAssertEqual(recovered.rejected, 1)
+        XCTAssertEqual(recovered.sessions.map(\.id), [newer.id, older.id])
+    }
+
+    func testRecoveryYieldsNothingWhenTheFileIsNotAJSONArray() {
+        let result = Journal.decodeRecovering(Data("broken".utf8))
+        XCTAssertTrue(result.sessions.isEmpty)
+        XCTAssertEqual(result.rejected, 0)
+    }
+
     func testCSVQuotesNewlinesAndNeutralizesFormulas() {
         let csv = Journal.csv([Session(duration: 12, notes: " =SUM(1,2)\n\"note\"")])
         XCTAssertTrue(csv.contains("\"' =SUM(1,2)\n\"\"note\"\"\""))

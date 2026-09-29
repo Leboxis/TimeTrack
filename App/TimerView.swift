@@ -61,7 +61,7 @@ struct TimerView: View {
                     Label("Journal personnel • données sur cet appareil", systemImage: "lock.shield")
                         .font(.footnote).foregroundStyle(.secondary)
                     if store.loadFailed {
-                        Text("Le journal n’a pas pu être chargé. Fermez puis rouvrez l’app ; le fichier existant n’a pas été modifié.")
+                        Text("Le journal n’a pas pu être lu en entier. Ouvrez Réglages pour exporter les séances récupérées ou réinitialiser le fichier local.")
                             .font(.footnote).foregroundStyle(.red)
                     }
                 }.padding(.horizontal, 20).padding(.bottom, 24)

@@ -6,6 +6,8 @@ import WellbeingCore
 final class JournalStore {
     private(set) var sessions: [Session] = []
     private(set) var loadFailed = false
+    /// Records that could not be read back while recovering a damaged journal.
+    private(set) var rejectedCount = 0
     var errorMessage: String?
     private let fileURL: URL
 
@@ -15,11 +17,46 @@ final class JournalStore {
         do {
             try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
             if FileManager.default.fileExists(atPath: fileURL.path) {
-                sessions = try Journal.decode(Data(contentsOf: fileURL))
+                let data = try Data(contentsOf: fileURL)
+                do {
+                    sessions = try Journal.decode(data)
+                } catch {
+                    // Strict decoding failed. Salvage the readable records so the journal
+                    // stays visible and exportable, but keep every mutation disabled so
+                    // the damaged file is never silently rewritten.
+                    let recovered = Journal.decodeRecovering(data)
+                    sessions = recovered.sessions
+                    rejectedCount = recovered.rejected
+                    loadFailed = true
+                    errorMessage = loadFailureMessage
+                }
             }
         } catch {
             loadFailed = true
             errorMessage = "Lecture impossible. Le journal existant est conservé. \(error.localizedDescription)"
+        }
+    }
+
+    var loadFailureMessage: String {
+        if sessions.isEmpty {
+            return "Le journal est illisible et aucune séance n’a pu être récupérée. Le fichier n’a pas été modifié. Vous pouvez le réinitialiser depuis Réglages."
+        }
+        return "\(sessions.count) séance(s) récupérée(s), \(rejectedCount) illisible(s). Le fichier n’a pas été modifié : exportez-le depuis Réglages avant toute réinitialisation."
+    }
+
+    /// Deliberately ignores `loadFailed`: the user asked to start over, which is the
+    /// only way to replace a file that strict decoding can no longer read.
+    @discardableResult func resetJournal() -> Bool {
+        do {
+            try Journal.encode([]).write(to: fileURL, options: [.atomic, .completeFileProtectionUnlessOpen])
+            sessions = []
+            rejectedCount = 0
+            loadFailed = false
+            errorMessage = nil
+            return true
+        } catch {
+            errorMessage = "Réinitialisation impossible. \(error.localizedDescription)"
+            return false
         }
     }
 

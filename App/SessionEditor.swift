@@ -7,12 +7,16 @@ struct SessionEditor: View {
     @State private var session: Session
     @State private var seconds: String
     @State private var saveFailed = false
+    @State private var confirmDelete = false
     let onSave: (Session) -> Bool
+    /// Provided only when editing a session that already exists in the journal.
+    var onDelete: (() -> Void)? = nil
 
-    init(session: Session, onSave: @escaping (Session) -> Bool) {
+    init(session: Session, onSave: @escaping (Session) -> Bool, onDelete: (() -> Void)? = nil) {
         _session = State(initialValue: session)
         _seconds = State(initialValue: String(Int(session.duration)))
         self.onSave = onSave
+        self.onDelete = onDelete
     }
 
     private var duration: Double? { Double(seconds.replacingOccurrences(of: ",", with: ".")) }
@@ -32,7 +36,7 @@ struct SessionEditor: View {
                         Text("Durée en secondes")
                         TextField("60", text: $seconds).keyboardType(.decimalPad).multilineTextAlignment(.trailing)
                     }
-                    if let duration, duration > 0, duration <= 86_400 {
+                    if let duration, duration >= 1, duration <= 86_400 {
                         Text(durationLabel(duration)).foregroundStyle(.secondary)
                     } else {
                         Text("Saisissez une durée entre 1 seconde et 24 heures.").font(.caption).foregroundStyle(.red)
@@ -50,7 +54,17 @@ struct SessionEditor: View {
                 Section("Notes personnelles") {
                     TextField("Contexte, énergie, ressenti…", text: $session.notes, axis: .vertical)
                         .lineLimit(4...12)
-                    Text("\(session.notes.count) / 10 000 caractères").font(.caption).foregroundStyle(.secondary)
+                    if session.notes.count > 10_000 {
+                        Text("Notes trop longues : \(session.notes.count) caractères pour 10 000 maximum.")
+                            .font(.caption).foregroundStyle(.red)
+                    } else {
+                        Text("\(session.notes.count) / 10 000 caractères").font(.caption).foregroundStyle(.secondary)
+                    }
+                }
+                if onDelete != nil {
+                    Section {
+                        Button("Supprimer cette séance", role: .destructive) { confirmDelete = true }
+                    }
                 }
                 if saveFailed {
                     Text("Enregistrement impossible. Vos modifications restent affichées ; réessayez.").foregroundStyle(.red)
@@ -68,6 +82,16 @@ struct SessionEditor: View {
                 }
             }
             .interactiveDismissDisabled()
+            .confirmationDialog("Supprimer cette séance ?", isPresented: $confirmDelete, titleVisibility: .visible) {
+                Button("Supprimer", role: .destructive) {
+                    onDelete?()
+                    dismiss()
+                }
+                Button("Annuler", role: .cancel) {}
+            } message: {
+                Text("Cette action est définitive.")
+            }
+            .privacyMask()
         }
     }
 }

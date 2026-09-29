@@ -17,7 +17,7 @@ public struct Session: Identifiable, Codable, Equatable {
     }
 
     public var isValid: Bool {
-        duration.isFinite && duration > 0 && duration <= 86_400
+        duration.isFinite && duration >= 1 && duration <= 86_400
             && (1...5).contains(feeling) && notes.count <= 10_000
             && date.timeIntervalSince1970.isFinite
     }
@@ -46,6 +46,30 @@ public enum Journal {
         let sessions = try decoder.decode([Session].self, from: data)
         _ = try encode(sessions)
         return sessions.sorted { $0.date > $1.date }
+    }
+
+    /// Salvage pass for a journal that fails strict decoding: keeps every record that
+    /// can be read back instead of hiding the whole history behind one bad entry.
+    /// A file that is not a JSON array at all yields nothing to recover.
+    public static func decodeRecovering(_ data: Data) -> (sessions: [Session], rejected: Int) {
+        guard let records = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]] else {
+            return ([], 0)
+        }
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        var seen = Set<UUID>()
+        var sessions: [Session] = []
+        var rejected = 0
+        for record in records {
+            guard let raw = try? JSONSerialization.data(withJSONObject: record),
+                  let session = try? decoder.decode(Session.self, from: raw),
+                  session.isValid, seen.insert(session.id).inserted else {
+                rejected += 1
+                continue
+            }
+            sessions.append(session)
+        }
+        return (sessions.sorted { $0.date > $1.date }, rejected)
     }
 
     public static func csv(_ sessions: [Session]) -> String {
