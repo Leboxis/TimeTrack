@@ -9,7 +9,7 @@ import WellbeingCore
 /// cache of resolved URLs.
 @MainActor @Observable
 final class FeedModel {
-    private static let userAgent = "Wellbeing/1.6 (iOS; RSS reader)"
+    private static let userAgent = "RedditMediaPocket/0.1 (iOS; RSS reader)"
     private static let subredditKey = "wellbeing.feed.subreddit"
 
     var subreddit: String {
@@ -98,7 +98,7 @@ final class FeedModel {
     }
 
     private func get(_ url: URL, headers: [String: String] = [:]) async throws -> (Data, URLResponse) {
-        var request = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalAndRemoteCacheData)
+        var request = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData)
         request.setValue(Self.userAgent, forHTTPHeaderField: "User-Agent")
         for (key, value) in headers { request.setValue(value, forHTTPHeaderField: key) }
         let cookie = await RedditSession.shared.cookieHeader(for: url)
@@ -148,6 +148,11 @@ final class FeedModel {
         configuration.httpShouldSetCookies = false
         configuration.httpCookieStorage = nil
         configuration.urlCredentialStorage = nil
+        configuration.urlCache = nil
+        configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
+        configuration.timeoutIntervalForRequest = 60
+        configuration.timeoutIntervalForResource = 1800
+        configuration.httpMaximumConnectionsPerHost = 6
         return URLSession(configuration: configuration, delegate: RedirectGuard(), delegateQueue: nil)
     }()
 
