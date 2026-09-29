@@ -88,10 +88,21 @@ Une ligne de plus qu'aujourd'hui au maximum.
 - Nouveau graphique en barres pour le type d'éjaculation : répartition du nombre de
   séances par type, sur la période sélectionnée.
 
+## Export CSV
+
+`Journal.csv` gagne trois colonnes, insérées entre `duree_secondes` et `notes` :
+
+```
+date_utc,duree_secondes,ressenti_sur_5,orgasme_sur_5,ressenti_mental_sur_5,type_ejaculation,notes
+```
+
+`type_ejaculation` reprend la valeur brute de l'énumération (`aucune`, `baveuse`,
+`jet`), donc en français. Aucune colonne ne passe par la neutralisation de formules :
+les deux échelles sont des entiers, le type vient d'une énumération fermée, et seule
+`notes` est une saisie libre — c'est elle qui reste protégée.
+
 ## Hors périmètre
 
-- **Colonnes CSV** : l'export reste `date_utc, duree_secondes, ressenti_sur_5, notes`.
-  Les trois nouvelles mesures n'y figurent pas. Décision de l'utilisateur, à revoir.
 - Sous-projet RSS (flux subreddit) et sous-projet galerie d'images.
 - Pas de migration du format de fichier, pas de numéro de version de schéma.
 
@@ -104,11 +115,16 @@ Une ligne de plus qu'aujourd'hui au maximum.
 2. `isValid` refuse `orgasm` hors 1-5.
 3. `isValid` refuse `mental` hors 1-5.
 4. Aller-retour encode/decode avec les trois champs renseignés.
-5. `Journal.csv` produit exactement l'en-tête et les colonnes actuels.
+5. `Journal.csv` produit l'en-tête
+   `date_utc,duree_secondes,ressenti_sur_5,orgasme_sur_5,ressenti_mental_sur_5,type_ejaculation,notes`
+   et les six valeurs d'une ligne, la colonne `type_ejaculation` valant la valeur
+   brute de l'énumération.
 6. `decodeRecovering` ne rejette aucune séance d'un fichier ancien valide.
 
 ## Notes de livraison
 
 - Version `MARKETING_VERSION` 1.3.0 → 1.4.0.
+- L'export CSV change d'en-tête : un tableur construit sur l'ancien format devra être
+  recreated, ses colonnes n'étant plus aux mêmes positions.
 - CI : `swift test` puis build iOS. Le test 1 est la vraie protection contre la
   régression de compatibilité.
