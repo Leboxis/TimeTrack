@@ -48,6 +48,9 @@ struct TrendsView: View {
                         SessionChart(sessions: sessions, selectedID: $selectedID, metric: .duration)
                         selectionCard
                         SessionChart(sessions: sessions, selectedID: $selectedID, metric: .feeling)
+                        SessionChart(sessions: sessions, selectedID: $selectedID, metric: .orgasm)
+                        SessionChart(sessions: sessions, selectedID: $selectedID, metric: .mental)
+                        EjaculationChart(sessions: sessions)
                         Text("Ces graphiques décrivent vos observations. Ils ne fixent aucun objectif de durée ou de performance.")
                             .font(.footnote).foregroundStyle(.secondary)
                     }
@@ -86,6 +89,13 @@ struct TrendsView: View {
                     Spacer()
                     Label("\(selected.feeling)/5", systemImage: "heart")
                 }.foregroundStyle(.secondary)
+                HStack(spacing: 6) {
+                    ForEach(["Orgasme \(selected.orgasm)/5", "Mental \(selected.mental)/5", selected.ejaculation.label], id: \.self) { text in
+                        Text(text).font(.caption2.weight(.medium))
+                            .padding(.horizontal, 7).padding(.vertical, 3)
+                            .background(Color.teal.opacity(0.12), in: Capsule())
+                    }
+                }
                 Text(selected.notes.isEmpty ? "Aucune note pour cette séance." : selected.notes)
                     .font(.subheadline).lineLimit(showFullNotes ? nil : 4)
                 if !selected.notes.isEmpty {
@@ -137,13 +147,57 @@ struct TrendsView: View {
     }
 }
 
+private struct EjaculationChart: View {
+    let sessions: [Session]
+
+    private var counts: [(type: Ejaculation, count: Int)] {
+        Ejaculation.allCases.map { option in
+            (option, sessions.count { $0.ejaculation == option })
+        }
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Type d’éjaculation").font(.title3.bold())
+            Chart {
+                ForEach(counts, id: \.type) { entry in
+                    BarMark(x: .value("Type", entry.type.label), y: .value("Séances", entry.count))
+                        .foregroundStyle(.teal)
+                        .accessibilityLabel("\(entry.type.label) : \(entry.count) séance(s)")
+                }
+            }
+            .frame(height: 180)
+            .accessibilityLabel("Répartition des types d’éjaculation")
+        }
+    }
+}
+
 private enum ChartMetric {
-    case duration, feeling
-    var title: String { self == .duration ? "Durées observées" : "Ressenti au fil du temps" }
+    case duration, feeling, orgasm, mental
+    var title: String {
+        switch self {
+        case .duration: return "Durées observées"
+        case .feeling: return "Ressenti au fil du temps"
+        case .orgasm: return "Ressenti de l’orgasme"
+        case .mental: return "Ressenti mental"
+        }
+    }
     var axisLabel: String { self == .duration ? "Secondes" : "Ressenti sur 5" }
-    var color: Color { self == .duration ? .teal : .purple }
+    var color: Color {
+        switch self {
+        case .duration: return .teal
+        case .feeling: return .purple
+        case .orgasm: return .indigo
+        case .mental: return .pink
+        }
+    }
     func value(_ session: Session) -> Double {
-        self == .duration ? session.duration : Double(session.feeling)
+        switch self {
+        case .duration: return session.duration
+        case .feeling: return Double(session.feeling)
+        case .orgasm: return Double(session.orgasm)
+        case .mental: return Double(session.mental)
+        }
     }
 }
 
