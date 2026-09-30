@@ -9,7 +9,6 @@ final class KDriveModel {
     private(set) var items: [KDriveItem] = []
     private(set) var loading = false
     var errorMessage: String?
-    @ObservationIgnored private var streamCache: [Int: URL] = [:]
 
     @ObservationIgnored var config = KDriveConfig(
         token: UserDefaults.standard.string(forKey: "kDriveToken") ?? "",
@@ -82,22 +81,10 @@ final class KDriveModel {
     /// download route to exactly such a URL, so the direct route is tried first and
     /// the documented `temporary_url` route is the fallback.
     func streamURL(for item: KDriveItem) async throws -> URL {
-        if let cached = streamCache[item.id] { return cached }
         if let resolved = try? await signedURL(from: KDriveClient.downloadURL(config: config, fileID: item.id)) {
-            streamCache[item.id] = resolved
             return resolved
         }
-        let resolved = try await signedURL(from: KDriveClient.temporaryURL(config: config, fileID: item.id, duration: 3600))
-        streamCache[item.id] = resolved
-        return resolved
-    }
-
-    /// Warms the signed URLs of the first few videos so a tap starts playing at once
-    /// instead of waiting on an API round trip.
-    func prewarm(_ items: [KDriveItem], limit: Int = 6) {
-        for item in items.filter({ $0.mediaKind == .video }).prefix(limit) where streamCache[item.id] == nil {
-            Task { [weak self] in _ = try? await self?.streamURL(for: item) }
-        }
+        return try await signedURL(from: KDriveClient.temporaryURL(config: config, fileID: item.id, duration: 3600))
     }
 
     /// The download route may answer 200 with bytes. In that case it is not a URL and

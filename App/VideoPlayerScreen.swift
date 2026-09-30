@@ -8,20 +8,26 @@ import UIKit
 struct VideoPlayerScreen: View {
     let item: MediaItem
     @Environment(\.dismiss) private var dismiss
-    @State private var player: AVPlayer?
+    /// Created empty on appear so the view controller exists and the screen responds to
+    /// the tap immediately; the item is attached as soon as the signed URL resolves.
+    @State private var player = AVPlayer()
+    @State private var resolving = true
     @State private var failed = false
 
     var body: some View {
         ZStack {
             Color.black.ignoresSafeArea()
-            if let player {
-                VideoSurface(player: player)
-                    .ignoresSafeArea()
-            } else if failed {
+            if failed {
                 ContentUnavailableView("Lecture impossible", systemImage: "exclamationmark.triangle")
                     .foregroundStyle(.white)
             } else {
-                ProgressView().tint(.white)
+                VideoSurface(player: player)
+                    .ignoresSafeArea()
+                    .overlay {
+                        if resolving {
+                            ProgressView().tint(.white).scaleEffect(1.4)
+                        }
+                    }
             }
             VStack {
                 HStack {
@@ -40,23 +46,22 @@ struct VideoPlayerScreen: View {
         }
         .privacyMask()
         .task {
-            guard player == nil, !failed else { return }
+            guard resolving, !failed else { return }
             do {
-                let url = try await resolve()
-                let av = AVPlayer(url: url)
-                av.actionAtItemEnd = .none
+                player.replaceCurrentItem(with: AVPlayerItem(url: try await resolve()))
+                player.actionAtItemEnd = .none
                 NotificationCenter.default.addObserver(
-                    forName: .AVPlayerItemDidPlayToEndTime, object: av.currentItem, queue: .main) { _ in
-                        av.seek(to: .zero)
-                        av.play()
+                    forName: .AVPlayerItemDidPlayToEndTime, object: player.currentItem, queue: .main) { _ in
+                        player.seek(to: .zero)
+                        player.play()
                     }
-                av.play()
-                player = av
+                player.play()
+                resolving = false
             } catch {
                 failed = true
             }
         }
-        .onDisappear { player?.pause() }
+        .onDisappear { player.pause() }
     }
 
     private func resolve() async throws -> URL {

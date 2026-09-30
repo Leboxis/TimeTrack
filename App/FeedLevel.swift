@@ -8,7 +8,7 @@ enum FeedLevel: Int, CaseIterable {
         case .zero: ["BBWFeet", "MommyMilfs", "PublicFeetPics", "feet", "feetgooned", "vagina"]
         case .one: ["burstingout", "OnOff"]
         case .two: ["milfspanties", "classyboners"]
-        case .three: ["ClothedForPrejac"]
+        case .three: ["ClothedForPrejacs"]
         case .four: ["CensoredFeet"]
         }
     }

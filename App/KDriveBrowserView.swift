@@ -48,10 +48,7 @@ struct KDriveBrowserView: View {
         .toolbar {
             ToolbarItem(placement: .principal) { breadcrumb }
         }
-        .task(id: current.id) {
-            await model.load(directoryID: current.id)
-            model.prewarm(model.items)
-        }
+        .task(id: current.id) { await model.load(directoryID: current.id) }
         .sheet(item: $playing) { MediaPlayerView(item: $0) }
         .fullScreenCover(item: $watching) { VideoPlayerScreen(item: $0) }
         .privacyMask()
@@ -69,11 +66,19 @@ struct KDriveBrowserView: View {
                           spacing: spacing) {
                     ForEach(model.items) { item in
                         cell(item, size: tile)
+                            .transition(.scale(scale: 0.88).combined(with: .opacity))
                     }
                 }
                 .padding(padding)
             }
+            // Re-keyed on the folder so entering a subfolder zooms in and going back
+            // zooms out, instead of a cross-dissolve that hides which tile was tapped.
+            .id(current.id)
+            .transition(.asymmetric(
+                insertion: .scale(scale: 0.92).combined(with: .opacity),
+                removal: .scale(scale: 1.06).combined(with: .opacity)))
         }
+        .animation(.snappy(duration: 0.28), value: current.id)
     }
 
     @ViewBuilder
@@ -105,7 +110,9 @@ struct KDriveBrowserView: View {
         .contentShape(Rectangle())
         .onTapGesture {
             if item.isDirectory {
-                path.append(KDrivePathNode(id: String(item.id), name: item.name))
+                withAnimation(.snappy(duration: 0.28)) {
+                    path.append(KDrivePathNode(id: String(item.id), name: item.name))
+                }
             } else {
                 open(item)
             }
@@ -137,8 +144,11 @@ struct KDriveBrowserView: View {
                     if index > 0 {
                         Image(systemName: "chevron.right").font(.caption2).foregroundStyle(.tertiary)
                     }
+                    .transition(.scale(scale: 0.8).combined(with: .opacity))
                     Button {
-                        path = Array(path.prefix(index + 1))
+                        withAnimation(.snappy(duration: 0.28)) {
+                            path = Array(path.prefix(index + 1))
+                        }
                     } label: {
                         Text(node.name).font(.caption).lineLimit(1)
                     }
