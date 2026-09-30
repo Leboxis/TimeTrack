@@ -13,9 +13,20 @@ final class KDriveTests: XCTestCase {
 
     func testDownloadURLShape() {
         let config = KDriveConfig(token: "tk", driveID: "42")
+        // v2, not v3, and the id sits between `files` and `download`. The OpenAPI spec
+        // has no /3/ download path at all.
         let url = KDriveClient.downloadURL(config: config, fileID: 77)
         XCTAssertEqual(url.absoluteString,
-            "https://api.infomaniak.com/3/drive/42/files/download/77")
+            "https://api.infomaniak.com/2/drive/42/files/77/download")
+    }
+
+    func testThumbnailAndTemporaryURLs() throws {
+        let config = KDriveConfig(token: "tk", driveID: "42")
+        XCTAssertEqual(KDriveClient.thumbnailURL(config: config, fileID: 77).absoluteString,
+            "https://api.infomaniak.com/2/drive/42/files/77/thumbnail")
+        let temporary = KDriveClient.temporaryURL(config: config, fileID: 77, duration: 600)
+        XCTAssertEqual(temporary.absoluteString,
+            "https://api.infomaniak.com/2/drive/42/files/77/temporary_url?duration=600")
     }
 
     func testDriveURLForConnectionTest() {

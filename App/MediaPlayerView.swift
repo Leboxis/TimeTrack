@@ -96,25 +96,27 @@ struct MediaPlayerView: View {
            let url = Bundle.main.url(forResource: resource, withExtension: item.kind == .audio ? "m4a" : "mp4") {
             return AVPlayer(url: url)
         }
-        guard let remote = item.url else { throw CocoaError(.fileNoSuchFile) }
+        guard item.url != nil else { throw CocoaError(.fileNoSuchFile) }
         let cached = FileManager.default.temporaryDirectory.appending(path: "\(item.id).media")
+        try await fetchData().write(to: cached, options: .atomic)
+        return AVPlayer(url: cached)
+    }
+
+    private func fetchData() async throws -> Data {
+        if let loader = item.loader { return try await loader() }
+        guard let remote = item.url else { throw CocoaError(.fileNoSuchFile) }
         var request = URLRequest(url: remote)
         for (field, value) in item.headers { request.setValue(value, forHTTPHeaderField: field) }
         let (data, response) = try await URLSession.shared.data(for: request)
         guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
             throw CocoaError(.fileReadCorruptFile)
         }
-        try data.write(to: cached, options: .atomic)
-        return AVPlayer(url: cached)
+        return data
     }
 
     private func loadImage() async {
-        guard let remote = item.url else { failed = true; return }
-        var request = URLRequest(url: remote)
-        for (field, value) in item.headers { request.setValue(value, forHTTPHeaderField: field) }
-        guard let (data, response) = try? await URLSession.shared.data(for: request),
-              let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode),
-              let image = UIImage(data: data), !Task.isCancelled else {
+        guard item.url != nil || item.loader != nil else { failed = true; return }
+        guard let data = try? await fetchData(), let image = UIImage(data: data), !Task.isCancelled else {
             failed = true
             return
         }

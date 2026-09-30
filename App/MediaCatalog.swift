@@ -15,11 +15,16 @@ struct MediaItem: Identifiable {
     let url: URL?
     /// Extra request headers, e.g. the kDrive bearer token.
     var headers: [String: String] = [:]
+    /// Preferred fetch path, e.g. kDrive's direct-then-signed fallback. When nil the
+    /// item is fetched straight from `url` with `headers`.
+    var loader: (() async throws -> Data)?
 
     init(id: String, title: String, subtitle: String, kind: MediaKind,
-         resource: String?, url: URL?, headers: [String: String] = [:]) {
+         resource: String?, url: URL?, headers: [String: String] = [:],
+         loader: (() async throws -> Data)? = nil) {
         self.id = id; self.title = title; self.subtitle = subtitle; self.kind = kind
         self.resource = resource; self.url = url; self.headers = headers
+        self.loader = loader
     }
 }
 

@@ -1,65 +1,92 @@
 import SwiftUI
+import UIKit
 import WellbeingCore
 
-/// One level of the kDrive path, for the breadcrumb.
-struct KDrivePathNode: Identifiable, Hashable {
-    let id: String
-    let name: String
-}
-
+/// Grid of kDrive items: folders plus media with their kDrive thumbnail.
 struct KDriveBrowserView: View {
     @State private var model = KDriveModel()
     @State private var path: [KDrivePathNode] = [KDrivePathNode(id: "1", name: "Racine")]
     @State private var playing: MediaItem?
-    @State private var showImage = false
+
+    private let columns = [GridItem(.adaptive(minimum: 104, maximum: 160), spacing: 12)]
 
     private var current: KDrivePathNode { path[path.count - 1] }
 
     var body: some View {
-        List {
+        Group {
             if model.loading && model.items.isEmpty {
-                HStack {
-                    Spacer()
-                    ProgressView()
-                    Spacer()
-                }
+                ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if let message = model.errorMessage {
                 ContentUnavailableView("kDrive indisponible", systemImage: "externaldrive.badge.exclamationmark",
                     description: Text(message))
-                Button("Réessayer") { Task { await model.load(directoryID: current.id) } }
+                    .overlay(alignment: .bottom) {
+                        Button("Réessayer") { Task { await model.load(directoryID: current.id) } }
+                            .buttonStyle(.borderedProminent)
+                            .padding(.bottom, 40)
+                    }
             } else if model.items.isEmpty {
                 ContentUnavailableView("Dossier vide", systemImage: "folder",
                     description: Text("Ce dossier ne contient aucun fichier lisible."))
-            }
-            ForEach(model.items) { item in
-                if item.isDirectory {
-                    Button {
-                        path.append(KDrivePathNode(id: String(item.id), name: item.name))
-                    } label: {
-                        row(icon: "folder.fill", title: item.name, tint: .teal)
-                    }
-                } else if item.mediaKind != nil {
-                    Button {
-                        open(item)
-                    } label: {
-                        row(icon: icon(for: item.mediaKind!), title: item.name,
-                             tint: .secondary, detail: ByteCountFormatter.string(fromByteCount: Int64(item.size ?? 0), countStyle: .file))
-                    }
-                } else {
-                    row(icon: "doc", title: item.name, tint: .secondary)
-                }
+            } else {
+                grid
             }
         }
         .navigationTitle(current.name)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            ToolbarItem(placement: .principal) {
-                breadcrumb
-            }
+            ToolbarItem(placement: .principal) { breadcrumb }
         }
         .task(id: current.id) { await model.load(directoryID: current.id) }
         .sheet(item: $playing) { MediaPlayerView(item: $0) }
         .privacyMask()
+    }
+
+    private var grid: some View {
+        ScrollView {
+            LazyVGrid(columns: columns, spacing: 12) {
+                ForEach(model.items) { item in
+                    if item.isDirectory {
+                        Button {
+                            path.append(KDrivePathNode(id: String(item.id), name: item.name))
+                        } label: {
+                            tile {
+                                VStack(spacing: 6) {
+                                    Image(systemName: "folder.fill").font(.title2)
+                                    Text(item.name).font(.caption).lineLimit(2)
+                                }
+                                .foregroundStyle(.teal)
+                            }
+                        }
+                    } else if item.mediaKind != nil {
+                        Button { open(item) } label: {
+                            tile {
+                                KDriveThumbnail(url: KDriveClient.thumbnailURL(config: model.config, fileID: item.id),
+                                                 token: model.config.token)
+                                Text(item.name).font(.caption2).lineLimit(2)
+                                    .foregroundStyle(.primary).padding(.top, 4)
+                            }
+                        }
+                    } else {
+                        tile {
+                            VStack(spacing: 6) {
+                                Image(systemName: "doc").font(.title2)
+                                Text(item.name).font(.caption2).lineLimit(2)
+                            }
+                            .foregroundStyle(.secondary)
+                        }
+                        .opacity(0.6)
+                    }
+                }
+            }
+            .padding(12)
+        }
+    }
+
+    private func tile<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
+        content()
+            .frame(maxWidth: .infinity, minHeight: 104)
+            .padding(8)
+            .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 12))
     }
 
     private var breadcrumb: some View {
@@ -69,7 +96,11 @@ struct KDriveBrowserView: View {
                     if index > 0 {
                         Image(systemName: "chevron.right").font(.caption2).foregroundStyle(.tertiary)
                     }
-                    Text(node.name).font(.caption).lineLimit(1)
+                    Button {
+                        path = Array(path.prefix(index + 1))
+                    } label: {
+                        Text(node.name).font(.caption).lineLimit(1)
+                    }
                 }
             }
         }
@@ -78,37 +109,40 @@ struct KDriveBrowserView: View {
 
     private func open(_ item: KDriveItem) {
         guard let kind = item.mediaKind else { return }
-        let mediaKind: MediaKind
-        switch kind {
-        case .image: mediaKind = .image
-        case .video: mediaKind = .video
-        case .audio: mediaKind = .audio
-        }
+        let mediaKind: MediaKind = kind == .image ? .image : (kind == .audio ? .audio : .video)
         playing = MediaItem(
             id: "kdrive-\(item.id)", title: item.name, subtitle: "kDrive",
             kind: mediaKind, resource: nil,
             url: KDriveClient.downloadURL(config: model.config, fileID: item.id),
-            headers: ["Authorization": "Bearer \(model.config.token)"])
+            headers: ["Authorization": "Bearer \(model.config.token)"],
+            loader: { try await model.download(item) })
     }
+}
 
-    private func icon(for kind: KDriveMediaKind) -> String {
-        switch kind {
-        case .image: "photo"
-        case .video: "play.rectangle"
-        case .audio: "waveform"
-        }
-    }
+private struct KDriveThumbnail: View {
+    let url: URL
+    let token: String
+    @State private var image: UIImage?
 
-    private func row(icon: String, title: String, tint: Color, detail: String? = nil) -> some View {
-        HStack(spacing: 12) {
-            Image(systemName: icon).foregroundStyle(tint)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title).font(.headline).foregroundStyle(.primary).lineLimit(1)
-                if let detail {
-                    Text(detail).font(.caption).foregroundStyle(.secondary)
-                }
+    var body: some View {
+        ZStack {
+            if let image {
+                Image(uiImage: image).resizable().scaledToFill()
+            } else {
+                Image(systemName: "photo").foregroundStyle(.tertiary)
             }
         }
-        .padding(.vertical, 4)
+        .frame(height: 88)
+        .frame(maxWidth: .infinity)
+        .clipped()
+        .task(id: url) {
+            guard image == nil else { return }
+            var request = URLRequest(url: url)
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+            guard let (data, response) = try? await URLSession.shared.data(for: request),
+                  let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode),
+                  let loaded = UIImage(data: data), !Task.isCancelled else { return }
+            image = loaded
+        }
     }
 }

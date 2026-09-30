@@ -115,9 +115,22 @@ public enum KDriveClient {
     }()
 
     /// Not present in the reference app: it has no download, stream or thumbnail path.
-    /// Derived from the shapes it does use, so it is the one assumption in this feature.
+    /// The OpenAPI spec has no /3/ download route at all — download is v2, with the file
+    /// id between `files` and `download`. Answers with bytes, possibly after a 302.
     public static func downloadURL(config: KDriveConfig, fileID: Int) -> URL {
-        URL(string: "\(base)/3/drive/\(config.driveID)/files/download/\(fileID)")!
+        URL(string: "\(base)/2/drive/\(config.driveID)/files/\(fileID)/download")!
+    }
+
+    public static func thumbnailURL(config: KDriveConfig, fileID: Int) -> URL {
+        URL(string: "\(base)/2/drive/\(config.driveID)/files/\(fileID)/thumbnail")!
+    }
+
+    /// Signed alternative to `downloadURL`, used when the direct call fails.
+    public static func temporaryURL(config: KDriveConfig, fileID: Int, duration: Int) -> URL {
+        var components = URLComponents(
+            string: "\(base)/2/drive/\(config.driveID)/files/\(fileID)/temporary_url")!
+        components.queryItems = [URLQueryItem(name: "duration", value: String(max(60, min(86_400, duration))))]
+        return components.url!
     }
 
     public static func decodePage(_ data: Data) throws -> KDrivePage {

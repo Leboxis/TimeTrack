@@ -76,19 +76,30 @@ final class KDriveModel {
         }
     }
 
-    /// Fetches a remote file into the temporary directory. kDrive answers the download
-    /// endpoint with a redirect, so following it lands on the real bytes.
-    func localFile(for item: KDriveItem) async throws -> URL {
-        var request = URLRequest(url: KDriveClient.downloadURL(config: config, fileID: item.id))
-        request.setValue("Bearer \(config.token)", forHTTPHeaderField: "Authorization")
+    /// Fetches a remote file into the temporary directory. The download route answers
+    /// with bytes, possibly after a 302 to a signed URL; if that fails, the documented
+    /// `temporary_url` route is tried.
+    func download(_ item: KDriveItem) async throws -> Data {
+        if let data = try? await fetch(KDriveClient.downloadURL(config: config, fileID: item.id)) {
+            return data
+        }
+        let raw = try await fetch(KDriveClient.temporaryURL(config: config, fileID: item.id, duration: 600))
+        struct Wrapper: Decodable { let data: Payload? }
+        struct Payload: Decodable { let temporary_url: String? }
+        guard let url = try JSONDecoder().decode(Wrapper.self, from: raw).data?.temporary_url,
+              let signed = URL(string: url) else {
+            throw KDriveError.serverError(0, "Aucune URL de téléchargement obtenue")
+        }
+        return try await fetch(signed, authorized: false)
+    }
+
+    private func fetch(_ url: URL, authorized: Bool = true) async throws -> Data {
+        var request = URLRequest(url: url)
+        if authorized { request.setValue("Bearer \(config.token)", forHTTPHeaderField: "Authorization") }
         let (data, response) = try await session.data(for: request)
         guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
-            throw KDriveError.serverError((response as? HTTPURLResponse)?.statusCode ?? 0,
-                                          "Lecture du fichier impossible")
+            throw KDriveError.serverError((response as? HTTPURLResponse)?.statusCode ?? 0, "HTTP")
         }
-        let destination = FileManager.default.temporaryDirectory
-            .appending(path: "kdrive-\(item.id).\(item.name.split(separator: ".").last.map(String.init) ?? "bin")")
-        try data.write(to: destination, options: .atomic)
-        return destination
+        return data
     }
 }
