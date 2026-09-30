@@ -16,10 +16,10 @@
       "versions": [
         {
           "version": "1.10.2",
-          "buildVersion": "68",
-          "date": "2026-09-30T10:52:58Z",
+          "buildVersion": "69",
+          "date": "2026-09-30T10:56:27Z",
           "downloadURL": "https://github.com/Leboxis/TimeTrack/releases/download/latest/Wellbeing.ipa",
-          "size": 70636058,
+          "size": 70636092,
           "minOSVersion": "17.0"
         }
       ]
