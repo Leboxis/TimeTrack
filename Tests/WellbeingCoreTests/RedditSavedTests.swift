@@ -71,7 +71,7 @@ final class RedditSavedTests: XCTestCase {
     }
 
     func testStopsOnARepeatedCursor() async throws {
-        // A server that keeps handing back the same cursor must not loop forever.
+        // A short page ends the walk on its own, so this stops after one call.
         var calls = 0
         let ids = try await RedditSaved.walkAllIDs(maxPages: 10) { _ in
             calls += 1
@@ -82,12 +82,15 @@ final class RedditSavedTests: XCTestCase {
     }
 
     func testStopsAtThePageCap() async throws {
+        // Every page is full and unique, so only maxPages bounds the walk.
         var calls = 0
-        _ = try await RedditSaved.walkAllIDs(maxPages: 3) { after in
+        let ids = try await RedditSaved.walkAllIDs(maxPages: 3) { after in
             calls += 1
-            return [Post(id: "t3_\(after ?? "0")", title: "a", html: "")]
+            let stamp = after ?? "0"
+            return (0..<100).map { Post(id: "t3_\(stamp)_\($0)", title: "a", html: "") }
         }
         XCTAssertEqual(calls, 3)
+        XCTAssertEqual(ids.count, 300)
     }
 
     func testAnEmptyFirstPageEndsTheWalk() async throws {

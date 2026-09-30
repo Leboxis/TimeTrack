@@ -21,15 +21,16 @@ public enum RedditSaved {
         Set(posts.map(\.id).filter { $0.hasPrefix("t3_") })
     }
 
-    /// `saved.rss` serves at most `limit` entries per call, so an account with hundreds
-    /// of saves needs the `after` cursor walked. One page is 100 ids, so this is cheap:
-    /// a 300-save account costs 3 requests, once per session, against a quota of 100
-    /// per ten minutes.
+    /// `saved.rss` serves at most `pageSize` entries per call, so an account with
+    /// hundreds of saves needs the `after` cursor walked. One page is 100 ids, so this is
+    /// cheap: a 300-save account costs 3 requests, once per session, against a quota of
+    /// 100 per ten minutes.
     ///
-    /// Stops on a short page, an empty page, a repeated cursor, or `maxPages`, so a
-    /// misbehaving server cannot turn this into an unbounded loop.
+    /// Stops on a short page, a page that adds nothing new, a repeated cursor, or
+    /// `maxPages`, so a misbehaving server cannot turn this into an unbounded loop.
     public static func walkAllIDs(
         maxPages: Int = 10,
+        pageSize: Int = 100,
         page: (String?) async throws -> [Post]
     ) async throws -> Set<String> {
         var all = Set<String>()
@@ -40,7 +41,8 @@ public enum RedditSaved {
             let fresh = ids(from: posts)
             let grew = !all.isSuperset(of: fresh)
             all.formUnion(fresh)
-            guard grew, let last = posts.last?.id, last.hasPrefix("t3_"), last != cursor else { break }
+            guard posts.count >= pageSize, grew,
+                  let last = posts.last?.id, last.hasPrefix("t3_"), last != cursor else { break }
             cursor = last
             if seenCursors.contains(last) { break }
             seenCursors.insert(last)
