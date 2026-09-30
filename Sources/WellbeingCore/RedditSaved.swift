@@ -21,6 +21,33 @@ public enum RedditSaved {
         Set(posts.map(\.id).filter { $0.hasPrefix("t3_") })
     }
 
+    /// `saved.rss` serves at most `limit` entries per call, so an account with hundreds
+    /// of saves needs the `after` cursor walked. One page is 100 ids, so this is cheap:
+    /// a 300-save account costs 3 requests, once per session, against a quota of 100
+    /// per ten minutes.
+    ///
+    /// Stops on a short page, an empty page, a repeated cursor, or `maxPages`, so a
+    /// misbehaving server cannot turn this into an unbounded loop.
+    public static func walkAllIDs(
+        maxPages: Int = 10,
+        page: (String?) async throws -> [Post]
+    ) async throws -> Set<String> {
+        var all = Set<String>()
+        var cursor: String?
+        var seenCursors = Set<String>()
+        for _ in 0..<max(1, maxPages) {
+            let posts = try await page(cursor)
+            let fresh = ids(from: posts)
+            let grew = !all.isSuperset(of: fresh)
+            all.formUnion(fresh)
+            guard grew, let last = posts.last?.id, last.hasPrefix("t3_"), last != cursor else { break }
+            cursor = last
+            if seenCursors.contains(last) { break }
+            seenCursors.insert(last)
+        }
+        return all
+    }
+
     /// Union, not intersection: a post saved in the app but no longer in the remote
     /// list stays marked until the user unsaves it here.
     public static func merge(local: Set<String>, remote: Set<String>) -> Set<String> {

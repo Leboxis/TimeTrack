@@ -61,23 +61,26 @@ final class RedditSession {
         }
     }
 
-    /// The account's whole saved list in one request. The caller is responsible for
-    /// rate limiting; see `FeedModel.refreshSavedIDs`.
+    /// The account's whole saved list, every page. The caller is responsible for rate
+    /// limiting; see `FeedModel.refreshSavedIDs`.
     func savedIDs() async throws -> Set<String> {
         guard hasSession else { throw RedditAccountError.anonymous }
         if account == nil { await loadAccount() }
-        guard let account, let url = RedditSaved.feedURL(username: account.username) else {
-            throw RedditAccountError.anonymous
+        guard let account else { throw RedditAccountError.anonymous }
+        return try await RedditSaved.walkAllIDs { after in
+            guard let url = RedditSaved.feedURL(username: account.username, limit: 100, after: after) else {
+                throw RedditAccountError.anonymous
+            }
+            var request = URLRequest(url: url)
+            if let cookie = await self.cookieHeader(for: url) {
+                request.setValue(cookie, forHTTPHeaderField: "Cookie")
+            }
+            let (data, response) = try await URLSession.shared.data(for: request)
+            guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
+                throw RedditAccountError.refused((response as? HTTPURLResponse)?.statusCode ?? 0)
+            }
+            return try FeedParser.parse(data)
         }
-        var request = URLRequest(url: url)
-        if let cookie = await cookieHeader(for: url) {
-            request.setValue(cookie, forHTTPHeaderField: "Cookie")
-        }
-        let (data, response) = try await URLSession.shared.data(for: request)
-        guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
-            throw RedditAccountError.refused((response as? HTTPURLResponse)?.statusCode ?? 0)
-        }
-        return RedditSaved.ids(from: try FeedParser.parse(data))
     }
 
     /// Saves or unsaves a post on the signed-in Reddit account.
