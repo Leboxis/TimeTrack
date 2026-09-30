@@ -44,12 +44,17 @@ public struct RedditAccount: Equatable {
         try Self.saveBody(fullname: fullname, modhash: modhash)
     }
 
+    /// `&`, `=` and `+` are form separators: leaving `+` literal would be read back
+    /// as a space by form parsers, and it is the only char that can change the meaning.
+    private static let bodyAllowed: CharacterSet = {
+        var set = CharacterSet.urlQueryAllowed
+        set.remove(charactersIn: "&=+")
+        return set
+    }()
+
     public static func saveBody(fullname: String, modhash: String) throws -> String {
-        guard let allowed = CharacterSet.urlQueryAllowed.subtracting(CharacterSet(charactersIn: "&=+")) else {
-            throw RedditAccountError.anonymous
-        }
         func encode(_ value: String) throws -> String {
-            let encoded = value.addingPercentEncoding(withAllowedCharacters: allowed)
+            let encoded = value.addingPercentEncoding(withAllowedCharacters: bodyAllowed)
             guard let encoded else { throw RedditAccountError.anonymous }
             return encoded
         }
