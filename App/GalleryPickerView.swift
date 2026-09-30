@@ -27,7 +27,8 @@ struct GalleryPickerView: View {
                         Text(kDriveReady
                              ? "Parcours de tes dossiers kDrive, avec lecture des médias."
                              : "Renseigne le jeton API et l’ID du Drive dans les Réglages.")
-                    }                    ForEach(galleries) { gallery in
+                    }
+                    ForEach(galleries) { gallery in
                         NavigationLink {
                             GalleryViewer(gallery: gallery)
                         } label: {
