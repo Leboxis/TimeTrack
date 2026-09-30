@@ -78,7 +78,13 @@ public enum Journal {
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
         let sessions = try decoder.decode([Session].self, from: data)
-        _ = try encode(sessions)
+        // A record can decode cleanly and still be out of range, which used to be caught
+        // by re-encoding the whole journal purely to validate it and throwing the bytes
+        // away. The same checks, without the serialisation.
+        guard sessions.allSatisfy(\.isValid),
+              Set(sessions.map(\.id)).count == sessions.count else {
+            throw JournalError.invalidData
+        }
         return sessions.sorted { $0.date > $1.date }
     }
 

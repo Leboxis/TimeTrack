@@ -4,6 +4,7 @@ import WellbeingCore
 struct TimerView: View {
     @Environment(JournalStore.self) private var store
     @Environment(SessionTimer.self) private var timer
+    @Environment(\.scenePhase) private var scenePhase
     @State private var draftSession: Session?
     @State private var confirmReset = false
     @State private var savingTimer = false
@@ -21,11 +22,15 @@ struct TimerView: View {
                     .padding(.top, 24)
 
                     VStack(spacing: 20) {
-                        TimelineView(.periodic(from: .now, by: 1)) { context in
-                            Text(durationLabel(timer.draft.elapsed(at: context.date)))
-                                .font(.system(size: 64, weight: .light, design: .rounded))
-                                .monospacedDigit().minimumScaleFactor(0.5).lineLimit(1)
-                                .accessibilityLabel("Durée : \(durationLabel(timer.draft.elapsed(at: context.date)))")
+                        // The periodic timeline never stopped: a `TabView` keeps its
+                        // children alive, so a once-a-second redraw ran for the whole
+                        // session, on another tab, with the screen held awake.
+                        if scenePhase == .active {
+                            TimelineView(.periodic(from: .now, by: 1)) { context in
+                                elapsedLabel(at: context.date)
+                            }
+                        } else {
+                            elapsedLabel(at: Date())
                         }
                         Text(timer.draft.startedAt == nil ? "À votre rythme" : "Séance en cours")
                             .font(.subheadline).foregroundStyle(.secondary)
@@ -82,5 +87,13 @@ struct TimerView: View {
                 Button("Annuler", role: .cancel) {}
             }
         }
+    }
+
+    private func elapsedLabel(at date: Date) -> some View {
+        let label = durationLabel(timer.draft.elapsed(at: date))
+        return Text(label)
+            .font(.system(size: 64, weight: .light, design: .rounded))
+            .monospacedDigit().minimumScaleFactor(0.5).lineLimit(1)
+            .accessibilityLabel("Durée : \(label)")
     }
 }

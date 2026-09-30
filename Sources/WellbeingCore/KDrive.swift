@@ -11,16 +11,25 @@ public struct KDriveConfig: Equatable {
         self.driveID = driveID.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
-    public var isComplete: Bool { !token.isEmpty && !driveID.isEmpty }
+    /// Drive ids are numeric. A pasted id carrying a space, a slash or a query marker
+    /// is a paste mistake, and it used to reach `URL(string:)!` and trap. It is refused
+    /// here, where the UI can turn it into a message, instead of crashing on the first
+    /// folder listing.
+    public var isValidDriveID: Bool {
+        guard !driveID.isEmpty, driveID.count <= 20 else { return false }
+        return driveID.range(of: "^[A-Za-z0-9_-]+$", options: .regularExpression) != nil
+    }
+
+    public var isComplete: Bool { !token.isEmpty && isValidDriveID }
 }
 
-public enum KDriveError: LocalizedError {
+public enum KDriveError: LocalizedError, Equatable {
     case invalidConfiguration, invalidURL, authenticationFailed, driveNotFound, serverError(Int, String)
 
     public var errorDescription: String? {
         switch self {
         case .invalidConfiguration:
-            return "Renseigne le jeton API et l’ID du Drive dans les Réglages."
+            return "Renseigne le jeton API et l’ID du Drive (chiffres) dans les Réglages."
         case .invalidURL:
             return "URL de requête kDrive invalide."
         case .authenticationFailed:
@@ -28,7 +37,7 @@ public enum KDriveError: LocalizedError {
         case .driveNotFound:
             return "Drive introuvable : vérifie l’ID du kDrive."
         case .serverError(let code, let message):
-            return "Erreur serveur (\(code)) : \(message)"
+            return code == 0 ? "Erreur kDrive : \(message)" : "Erreur serveur (\(code)) : \(message)"
         }
     }
 }
@@ -87,16 +96,39 @@ private struct KDriveEnvelope<T: Decodable>: Decodable {
     }
 }
 
+/// The `temporary_url` route answers with a small JSON envelope whose only payload is
+/// the signed URL. Kept apart from the transport so it can be tested on its own.
+private struct KDriveSignedURLEnvelope: Decodable {
+    struct Payload: Decodable {
+        let temporaryURL: String?
+
+        private enum CodingKeys: String, CodingKey {
+            case temporaryURL = "temporary_url"
+        }
+    }
+
+    let data: Payload?
+}
+
 public enum KDriveClient {
     static let base = "https://api.infomaniak.com"
     static let pageLimit = 200
 
-    public static func driveURL(config: KDriveConfig) -> URL {
-        URL(string: "\(base)/2/drive/\(config.driveID)")!
+    /// Assembled from a path rather than a concatenated string: the path component is
+    /// percent-encoded for us, so a malformed id can neither reshape the route nor
+    /// produce a nil URL that something downstream would have to force-unwrap.
+    private static func url(_ path: String, percentEncodedQuery query: String? = nil) -> URL? {
+        guard var components = URLComponents(string: base) else { return nil }
+        components.path = path
+        if let query { components.percentEncodedQuery = query }
+        return components.url
     }
 
-    public static func listURL(config: KDriveConfig, directoryID: String, cursor: String?) -> URL {
-        var components = URLComponents(string: "\(base)/3/drive/\(config.driveID)/files/\(directoryID)/files")!
+    public static func driveURL(config: KDriveConfig) -> URL? {
+        url("/2/drive/\(config.driveID)")
+    }
+
+    public static func listURL(config: KDriveConfig, directoryID: String, cursor: String?) -> URL? {
         var query = "limit=\(pageLimit)"
         if let cursor, !cursor.isEmpty {
             // Strict encoding: URLQueryItem would leave `+` literal, and many servers
@@ -104,8 +136,7 @@ public enum KDriveClient {
             let encoded = cursor.addingPercentEncoding(withAllowedCharacters: strictQueryAllowed) ?? cursor
             query += "&cursor=\(encoded)"
         }
-        components.percentEncodedQuery = query
-        return components.url!
+        return url("/3/drive/\(config.driveID)/files/\(directoryID)/files", percentEncodedQuery: query)
     }
 
     private static let strictQueryAllowed: CharacterSet = {
@@ -116,27 +147,52 @@ public enum KDriveClient {
 
     /// Not present in the reference app: it has no download, stream or thumbnail path.
     /// The OpenAPI spec has no /3/ download route at all — download is v2, with the file
-    /// id between `files` and `download`. Answers with bytes, possibly after a 302.
-    public static func downloadURL(config: KDriveConfig, fileID: Int) -> URL {
-        URL(string: "\(base)/2/drive/\(config.driveID)/files/\(fileID)/download")!
+    /// id between `files` and `download`. Answers with a redirect to a signed URL.
+    public static func downloadURL(config: KDriveConfig, fileID: Int) -> URL? {
+        url("/2/drive/\(config.driveID)/files/\(fileID)/download")
     }
 
-    public static func thumbnailURL(config: KDriveConfig, fileID: Int) -> URL {
-        URL(string: "\(base)/2/drive/\(config.driveID)/files/\(fileID)/thumbnail")!
+    public static func thumbnailURL(config: KDriveConfig, fileID: Int) -> URL? {
+        url("/2/drive/\(config.driveID)/files/\(fileID)/thumbnail")
     }
 
-    /// Signed alternative to `downloadURL`, used when the direct call fails.
-    public static func temporaryURL(config: KDriveConfig, fileID: Int, duration: Int) -> URL {
-        var components = URLComponents(
-            string: "\(base)/2/drive/\(config.driveID)/files/\(fileID)/temporary_url")!
-        components.queryItems = [URLQueryItem(name: "duration", value: String(max(60, min(86_400, duration))))]
-        return components.url!
+    /// Signed alternative to `downloadURL`, used when the direct call answers with
+    /// bytes rather than a redirect.
+    public static func temporaryURL(config: KDriveConfig, fileID: Int, duration: Int) -> URL? {
+        let clamped = max(60, min(86_400, duration))
+        return url("/2/drive/\(config.driveID)/files/\(fileID)/temporary_url",
+                   percentEncodedQuery: "duration=\(clamped)")
     }
+
+    /// The signed, self-authorizing URL carried by a `temporary_url` envelope. Returns
+    /// nil for anything that is not one — a media body in particular, which the caller
+    /// must never mistake for a streamable URL.
+    public static func signedURL(in data: Data) -> URL? {
+        guard let envelope = try? JSONDecoder().decode(KDriveSignedURLEnvelope.self, from: data),
+              let raw = envelope.data?.temporaryURL,
+              let parsed = URL(string: raw),
+              let scheme = parsed.scheme?.lowercased(),
+              scheme == "https" || scheme == "http" else { return nil }
+        return parsed
+    }
+
+    /// Credential failures also arrive inside the JSON body, so the HTTP status is not
+    /// the only place a bad token shows up. Reporting those as "server error (0)" sent
+    /// the user to check their Drive id instead of their token.
+    private static let authenticationCodes: Set<String> = [
+        "unauthorized", "unauthenticated", "forbidden", "invalid_token", "invalid_credentials", "401",
+    ]
 
     public static func decodePage(_ data: Data) throws -> KDrivePage {
         let envelope = try JSONDecoder().decode(KDriveEnvelope<[KDriveItem]>.self, from: data)
         if envelope.result == "error", let error = envelope.error {
-            throw KDriveError.serverError(0, error.description ?? error.code ?? "erreur inconnue")
+            if authenticationCodes.contains(error.code ?? "") {
+                throw KDriveError.authenticationFailed
+            }
+            let detail = [error.code, error.description]
+                .compactMap { $0 }
+                .filter { !$0.isEmpty }
+            throw KDriveError.serverError(0, detail.isEmpty ? "erreur inconnue" : detail.joined(separator: " — "))
         }
         return KDrivePage(items: envelope.data ?? [],
                           hasMore: envelope.hasMore ?? false,
@@ -153,17 +209,20 @@ public enum KDriveClient {
     }
 
     /// Walks the `cursor` / `has_more` pagination. The reference loops forever when the
-    /// server says `has_more` with a null cursor; this breaks instead.
+    /// server says `has_more` with a null cursor; this breaks instead. Pages can also
+    /// overlap, so items are de-duplicated by id: a repeat would render as a second,
+    /// identical tile in the grid.
     public static func listAll(config: KDriveConfig, directoryID: String,
                                page: (String?) async throws -> KDrivePage) async throws -> [KDriveItem] {
         var all: [KDriveItem] = []
+        var seenIDs = Set<Int>()
         var cursor: String?
-        var seen = Set<String>()
+        var seenCursors = Set<String>()
         while true {
             let result = try await page(cursor)
-            all.append(contentsOf: result.items)
+            for item in result.items where seenIDs.insert(item.id).inserted { all.append(item) }
             guard result.hasMore else { break }
-            guard let next = result.cursor, !next.isEmpty, seen.insert(next).inserted else { break }
+            guard let next = result.cursor, !next.isEmpty, seenCursors.insert(next).inserted else { break }
             cursor = next
         }
         return all

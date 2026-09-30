@@ -6,22 +6,7 @@ struct FeedView: View {
     @State private var model = FeedModel()
     @State private var visibleID: String?
 
-    private var entries: [FeedEntry] {
-        var result: [FeedEntry] = []
-        for post in model.posts {
-            let media = MediaExtractor.extract(post.html)
-            if !media.isEmpty {
-                for (index, item) in media.enumerated() {
-                    result.append(FeedEntry(id: "\(post.id)-\(index)", post: post, media: item,
-                                            thumbnail: MediaExtractor.previewImage(post.html)))
-                }
-            } else if GalleryFeed.linked(post.html) {
-                result.append(FeedEntry(id: "\(post.id)-gallery", post: post, media: nil,
-                                        thumbnail: MediaExtractor.previewImage(post.html)))
-            }
-        }
-        return result
-    }
+    private var entries: [FeedEntry] { model.entries }
 
     private var current: FeedEntry? {
         guard let visibleID else { return entries.first }

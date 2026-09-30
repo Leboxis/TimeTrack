@@ -16,14 +16,28 @@ final class RedditSession {
 
     let store = WKWebsiteDataStore.default()
     private var observer: (any WKHTTPCookieStoreObserver)?
+    /// Reddit rewrites its cookies constantly, and every change used to trigger a full
+    /// cookie fetch plus a possible `/api/me.json` round trip. One login writes a dozen
+    /// cookies, so a single sign-in meant a dozen account requests.
+    private var refreshTask: Task<Void, Never>?
 
     private init() {
         let observer = CookieObserver { [weak self] in
-            Task { @MainActor in await self?.refresh() }
+            self?.scheduleRefresh()
         }
         self.observer = observer
         store.httpCookieStore.add(observer)
-        Task { await refresh() }
+        scheduleRefresh()
+    }
+
+    /// Collapses a burst of cookie writes into one refresh.
+    private func scheduleRefresh() {
+        refreshTask?.cancel()
+        refreshTask = Task { [weak self] in
+            try? await Task.sleep(for: .milliseconds(300))
+            guard !Task.isCancelled else { return }
+            await self?.refresh()
+        }
     }
 
     private func allCookies() async -> [HTTPCookie] {
@@ -111,12 +125,17 @@ final class RedditSession {
     /// Narrower than the reference, which wipes all website data. Only the cookies go.
     func logout() async {
         clearing = true
+        refreshTask?.cancel()
         for cookie in await allCookies() {
             await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
                 store.httpCookieStore.delete(cookie) { continuation.resume() }
             }
         }
         hasSession = false
+        // The account carried the username and the modhash used by every write. Keeping
+        // it meant reconnecting as somebody else still showed, and still saved to, the
+        // previous account.
+        account = nil
         clearing = false
     }
 }

@@ -1,4 +1,3 @@
-import ImageIO
 import SwiftUI
 import UIKit
 import WellbeingCore
@@ -37,7 +36,10 @@ struct FeedCard: View {
             } else if let gallery {
                 TabView(selection: $galleryIndex) {
                     ForEach(Array(gallery.enumerated()), id: \.offset) { position, item in
-                        GalleryPage(media: item, active: isActive && position == galleryIndex, model: model)
+                        GalleryPage(media: item,
+                                    active: isActive && position == galleryIndex,
+                                    preloads: abs(position - galleryIndex) <= 1,
+                                    model: model)
                             .tag(position)
                     }
                 }
@@ -77,33 +79,45 @@ struct FeedCard: View {
     }
 
     private func load() async {
-        if let thumbURL = entry.thumbnail,
-           let thumb = try? await model.loadImage(thumbURL, maxPixels: 960),
-           !Task.isCancelled {
-            self.thumb = thumb
-        }
-        guard !Task.isCancelled else { return }
+        // The two requests run together. They used to be sequential, so the poster of a
+        // video or a photo was fully downloaded before the media itself even started.
+        let preview = Task { try? await loadPreview() }
+        var failedToLoad = false
         do {
-            switch entry.media {
-            case .direct(let url):
-                if Self.isVideo(url) {
-                    videoURL = url
-                } else {
-                    image = try await model.loadImage(url, maxPixels: 2048)
-                }
-            case .redditVideo(let base):
-                videoURL = base.appending(path: "HLSPlaylist.m3u8")
-            case .redgifs(let id):
-                videoURL = try await model.redgifsStreamURL(id: id)
-            case nil:
-                let items = try await model.galleryMedia(feedID: entry.post.id)
-                guard !items.isEmpty else { throw FeedError.invalidFeed }
-                gallery = items
-            }
+            try await loadMedia()
         } catch is CancellationError {
-            // The card scrolled away; a newer task owns the state now.
+            preview.cancel()
         } catch {
-            if !Task.isCancelled { failed = true }
+            preview.cancel()
+            failedToLoad = !Task.isCancelled
+        }
+        // Still awaited on the happy path: it is the small one, and showing the poster
+        // is what fills the gap until the media arrives.
+        if let image = await preview.value, !Task.isCancelled { thumb = image }
+        if failedToLoad { failed = true }
+    }
+
+    private func loadPreview() async throws -> UIImage? {
+        guard let thumbURL = entry.thumbnail else { return nil }
+        return try await model.loadImage(thumbURL, maxPixels: 960)
+    }
+
+    private func loadMedia() async throws {
+        switch entry.media {
+        case .direct(let url):
+            if Self.isVideo(url) {
+                videoURL = url
+            } else {
+                image = try await model.loadImage(url, maxPixels: 2048)
+            }
+        case .redditVideo(let base):
+            videoURL = base.appending(path: "HLSPlaylist.m3u8")
+        case .redgifs(let id):
+            videoURL = try await model.redgifsStreamURL(id: id)
+        case nil:
+            let items = try await model.galleryMedia(feedID: entry.post.id)
+            guard !items.isEmpty else { throw FeedError.invalidFeed }
+            gallery = items
         }
     }
 
@@ -119,6 +133,10 @@ struct FeedCard: View {
 private struct GalleryPage: View {
     let media: Media
     let active: Bool
+    /// A `TabView` builds every page at once, so a 20-image gallery used to start 20
+    /// full-size downloads before the user had swiped anywhere. Only the current page
+    /// and its two neighbours are fetched.
+    let preloads: Bool
     let model: FeedModel
     @State private var image: UIImage?
     @State private var failed = false
@@ -148,8 +166,9 @@ private struct GalleryPage: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color.black)
-        .task {
-            if case .direct(let url) = media { await load(url: url) }
+        .task(id: preloads) {
+            guard preloads, image == nil, case .direct(let url) = media else { return }
+            await load(url: url)
         }
     }
 

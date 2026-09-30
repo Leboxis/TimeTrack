@@ -23,6 +23,7 @@ struct SettingsView: View {
     @State private var confirmReset = false
     @State private var reddit = RedditSession.shared
     @State private var syncModel = FeedModel()
+    @State private var syncStatus: String?
     @State private var loginPresented = false
 
     var body: some View {
@@ -62,10 +63,31 @@ struct SettingsView: View {
                     if let account = reddit.account {
                         LabeledContent("Connecté en tant que", value: account.username)
                     }
-                    Button("Synchroniser mes sauvegardes Reddit") {
-                        Task { await syncModel.refreshSavedIDs(force: true) }
+                    Button {
+                        syncStatus = nil
+                        Task {
+                            await syncModel.refreshSavedIDs(force: true)
+                            // The button used to press, fire a request and show
+                            // nothing at all: a successful sync and a no-op were
+                            // indistinguishable.
+                            syncStatus = syncModel.savedIDs.isEmpty
+                                ? "Aucune sauvegarde synchronisée."
+                                : "\(syncModel.savedIDs.count) sauvegarde(s) synchronisée(s)."
+                        }
+                    } label: {
+                        if syncModel.refreshingSaved {
+                            HStack(spacing: 8) {
+                                ProgressView().controlSize(.small)
+                                Text("Synchronisation…")
+                            }
+                        } else {
+                            Text("Synchroniser mes sauvegardes Reddit")
+                        }
                     }
                     .disabled(!reddit.hasSession || syncModel.refreshingSaved)
+                    if let syncStatus {
+                        Text(syncStatus).font(.footnote).foregroundStyle(.secondary)
+                    }
                     Button(reddit.hasSession ? "Ouvrir Reddit" : "Se connecter à Reddit") {
                         loginPresented = true
                     }
@@ -84,7 +106,7 @@ struct SettingsView: View {
                 } header: {
                     Text("kDrive")
                 } footer: {
-                    Text("Jeton API Infomaniak et ID du Drive. Le jeton est stocké en clair dans les réglages de l’app :anyone y ayant accès peut lire ton Drive. Retire-le si l’app est partagée.")
+                        Text("Jeton API Infomaniak et ID du Drive. Le jeton est stocké en clair dans les réglages de l’app : quiconque y ayant accès peut lire ton Drive. Retire-le si l’app est partagée.")
                 }
                 Section("Confidentialité") {
                     Label("Journal local, sans compte ni suivi", systemImage: "person.crop.circle.badge.checkmark")

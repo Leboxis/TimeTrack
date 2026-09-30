@@ -1,4 +1,3 @@
-import ImageIO
 import SwiftUI
 import UIKit
 import WellbeingCore
@@ -8,6 +7,10 @@ struct KDrivePathNode: Identifiable, Hashable {
     let id: String
     let name: String
 }
+
+/// Decoded thumbnails, shared across cells. Without it, scrolling back up re-downloads
+/// every tile the user has already seen.
+private let kDriveThumbnailCache = NSCache<NSString, UIImage>()
 
 /// Grid of kDrive items. Every tile has the same geometry whatever the media, so the
 /// name always sits in its own band and never overlaps a neighbour.
@@ -26,7 +29,7 @@ struct KDriveBrowserView: View {
 
     var body: some View {
         Group {
-            if model.loading && model.items.isEmpty {
+            if model.loading || !model.hasLoaded {
                 ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if let message = model.errorMessage {
                 ContentUnavailableView("kDrive indisponible", systemImage: "externaldrive.badge.exclamationmark",
@@ -43,13 +46,22 @@ struct KDriveBrowserView: View {
                 grid
             }
         }
-        .navigationTitle(current.name)
+        // The breadcrumb sits in the principal slot, which *is* the inline title
+        // position: declaring `navigationTitle` as well only fought it for room and left
+        // two competing labels in one bar.
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .principal) { breadcrumb }
         }
-        .task(id: current.id) { await model.load(directoryID: current.id) }
-        .sheet(item: $playing) { MediaPlayerView(item: $0) }
+        .task(id: current.id) {
+            // The token may have been pasted in the settings since this browser was
+            // pushed; the model is not rebuilt, so it has to be told.
+            model.reloadConfig()
+            await model.load(directoryID: current.id)
+        }
+        .sheet(item: $playing) { item in
+            NavigationStack { MediaPlayerView(item: item, showsCloseButton: true) }
+        }
         .fullScreenCover(item: $watching) { VideoPlayerScreen(item: $0) }
         .privacyMask()
     }
@@ -66,19 +78,16 @@ struct KDriveBrowserView: View {
                           spacing: spacing) {
                     ForEach(model.items) { item in
                         cell(item, size: tile)
-                            .transition(.scale(scale: 0.88).combined(with: .opacity))
                     }
                 }
                 .padding(padding)
             }
+            .refreshable { await model.load(directoryID: current.id) }
             // Re-keyed on the folder so entering a subfolder zooms in and going back
             // zooms out, instead of a cross-dissolve that hides which tile was tapped.
             .id(current.id)
-            .transition(.asymmetric(
-                insertion: .scale(scale: 0.92).combined(with: .opacity),
-                removal: .scale(scale: 1.06).combined(with: .opacity)))
+            .animation(.snappy(duration: 0.28), value: current.id)
         }
-        .animation(.snappy(duration: 0.28), value: current.id)
     }
 
     @ViewBuilder
@@ -110,9 +119,7 @@ struct KDriveBrowserView: View {
         .contentShape(Rectangle())
         .onTapGesture {
             if item.isDirectory {
-                withAnimation(.snappy(duration: 0.28)) {
-                    path.append(KDrivePathNode(id: String(item.id), name: item.name))
-                }
+                path.append(KDrivePathNode(id: String(item.id), name: item.name))
             } else {
                 open(item)
             }
@@ -126,11 +133,13 @@ struct KDriveBrowserView: View {
                 .font(.system(size: 30))
                 .foregroundStyle(.teal)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-        } else if item.mediaKind != nil {
-            KDriveThumbnail(url: KDriveClient.thumbnailURL(config: model.config, fileID: item.id),
-                            token: model.config.token, maxPixels: Int(size * 3))
+        } else if let kind = item.mediaKind, kind != .audio,
+                  let url = KDriveClient.thumbnailURL(config: model.config, fileID: item.id) {
+            // No thumbnail request for audio: there is no image behind it, so the call
+            // could only ever 404.
+            KDriveThumbnail(url: url, token: model.config.token, maxPixels: max(64, Int(size * 3)))
         } else {
-            Image(systemName: "doc")
+            Image(systemName: item.mediaKind == .audio ? "waveform" : "doc")
                 .font(.system(size: 26))
                 .foregroundStyle(.secondary)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -145,15 +154,13 @@ struct KDriveBrowserView: View {
                         Image(systemName: "chevron.right").font(.caption2).foregroundStyle(.tertiary)
                     }
                     Button {
-                        withAnimation(.snappy(duration: 0.28)) {
-                            path = Array(path.prefix(index + 1))
-                        }
+                        path = Array(path.prefix(index + 1))
                     } label: {
                         Text(node.name).font(.caption).lineLimit(1)
                     }
-                    .transition(.scale(scale: 0.8).combined(with: .opacity))
                 }
             }
+            .padding(.horizontal, 2)
         }
         .frame(height: 22)
     }
@@ -164,9 +171,12 @@ struct KDriveBrowserView: View {
         let entry = MediaItem(
             id: "kdrive-\(item.id)", title: item.name, subtitle: "kDrive",
             kind: mediaKind, resource: nil,
-            url: KDriveClient.downloadURL(config: model.config, fileID: item.id),
-            // Resolved to a signed URL, then streamed. AVPlayer handles the redirect
-            // chain and ranges the file, so no bytes pass through the app.
+            // The signed URL is resolved lazily and is the only thing the player needs;
+            // a direct `url` would only invite someone to stream the authenticated route
+            // and buffer whatever the server felt like sending.
+            url: nil,
+            // AVPlayer follows the redirect chain and ranges the file, so no bytes of the
+            // media pass through the app.
             streamURL: { try await self.model.streamURL(for: item) })
         if kind == .video {
             watching = entry
@@ -176,7 +186,7 @@ struct KDriveBrowserView: View {
     }
 }
 
-/// Square thumbnail, decoded downsampled so a large source never bloats memory.
+/// Square thumbnail, decoded downsampled off the main actor and cached across cells.
 private struct KDriveThumbnail: View {
     let url: URL
     let token: String
@@ -194,19 +204,19 @@ private struct KDriveThumbnail: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .clipped()
         .task(id: url) {
-            guard image == nil else { return }
+            let key = url.absoluteString as NSString
+            if let cached = kDriveThumbnailCache.object(forKey: key) {
+                image = cached
+                return
+            }
             var request = URLRequest(url: url)
             request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
             guard let (data, response) = try? await URLSession.shared.data(for: request),
                   let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode),
-                  let source = CGImageSourceCreateWithData(data as CFData, nil),
-                  let cg = CGImageSourceCreateThumbnailAtIndex(source, 0, [
-                      kCGImageSourceCreateThumbnailFromImageAlways: true,
-                      kCGImageSourceCreateThumbnailWithTransform: true,
-                      kCGImageSourceThumbnailMaxPixelSize: max(64, maxPixels)
-                  ] as CFDictionary),
+                  let loaded = await ImageDecoder.image(from: data, maxPixels: maxPixels),
                   !Task.isCancelled else { return }
-            self.image = UIImage(cgImage: cg)
+            kDriveThumbnailCache.setObject(loaded, forKey: key)
+            image = loaded
         }
     }
 }

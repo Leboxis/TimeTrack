@@ -13,6 +13,10 @@ struct VideoPlayerScreen: View {
     @State private var player = AVPlayer()
     @State private var resolving = true
     @State private var failed = false
+    /// Held so it can be removed. The token used to be thrown away while the closure
+    /// captured the player strongly, so every video opened leaked a player, its item
+    /// and its buffer — and the loop-back kept firing on all of them.
+    @State private var endObserver: Any?
 
     var body: some View {
         ZStack {
@@ -48,12 +52,13 @@ struct VideoPlayerScreen: View {
         .task {
             guard resolving, !failed else { return }
             do {
-                player.replaceCurrentItem(with: AVPlayerItem(url: try await resolve()))
+                let item = AVPlayerItem(url: try await resolve())
+                player.replaceCurrentItem(with: item)
                 player.actionAtItemEnd = .none
-                NotificationCenter.default.addObserver(
-                    forName: .AVPlayerItemDidPlayToEndTime, object: player.currentItem, queue: .main) { _ in
-                        player.seek(to: .zero)
-                        player.play()
+                endObserver = NotificationCenter.default.addObserver(
+                    forName: .AVPlayerItemDidPlayToEndTime, object: item, queue: .main) { [weak player] _ in
+                        player?.seek(to: .zero)
+                        player?.play()
                     }
                 player.play()
                 resolving = false
@@ -61,7 +66,15 @@ struct VideoPlayerScreen: View {
                 failed = true
             }
         }
-        .onDisappear { player.pause() }
+        .onDisappear { teardown() }
+    }
+
+    private func teardown() {
+        player.pause()
+        if let endObserver {
+            NotificationCenter.default.removeObserver(endObserver)
+            self.endObserver = nil
+        }
     }
 
     private func resolve() async throws -> URL {
