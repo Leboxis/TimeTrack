@@ -15,11 +15,11 @@
       "iconURL": "https://github.com/Leboxis/TimeTrack/releases/download/latest/icon.png",
       "versions": [
         {
-          "version": "1.9.2",
-          "buildVersion": "57",
-          "date": "2026-09-30T09:37:17Z",
+          "version": "1.10.0",
+          "buildVersion": "60",
+          "date": "2026-09-30T09:47:46Z",
           "downloadURL": "https://github.com/Leboxis/TimeTrack/releases/download/latest/Wellbeing.ipa",
-          "size": 70567427,
+          "size": 70593894,
           "minOSVersion": "17.0"
         }
       ]
