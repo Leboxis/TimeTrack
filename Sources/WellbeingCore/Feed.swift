@@ -160,6 +160,7 @@ public enum MediaExtractor {
                   let host = components.host?.lowercased() else { return nil }
             guard ["preview.redd.it", "external-preview.redd.it"].contains(host) else { return nil }
             components.host = "i.redd.it"
+            components.query = nil
             guard let original = components.url, !original.pathExtension.isEmpty else { return nil }
             guard seen.insert(.direct(original)).inserted else { return nil }
             return .direct(original)
