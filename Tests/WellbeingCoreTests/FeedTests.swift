@@ -7,6 +7,13 @@ final class FeedTests: XCTestCase {
             "https://www.reddit.com/r/feet/new.rss?limit=25")
     }
 
+    func testFeedURLCarriesTheAfterCursor() {
+        XCTAssertEqual(feedURL(subreddit: "feet", after: "t3_abc123").absoluteString,
+            "https://www.reddit.com/r/feet/new.rss?limit=25&after=t3_abc123")
+        XCTAssertEqual(feedURL(subreddit: "feet", after: nil).absoluteString,
+            "https://www.reddit.com/r/feet/new.rss?limit=25")
+    }
+
     func testSubredditValidation() throws {
         XCTAssertEqual(try subredditName("  vagina "), "vagina")
         XCTAssertThrowsError(try subredditName("a"))
