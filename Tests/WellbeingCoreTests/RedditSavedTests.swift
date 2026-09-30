@@ -2,14 +2,14 @@ import XCTest
 @testable import WellbeingCore
 
 final class RedditSavedTests: XCTestCase {
-    func testSavedFeedURL() {
-        let url = RedditSaved.feedURL(username: "clairbear99", limit: 100)
+    func testSavedFeedURL() throws {
+        let url = try XCTUnwrap(RedditSaved.feedURL(username: "clairbear99", limit: 100))
         XCTAssertEqual(url.absoluteString,
             "https://www.reddit.com/user/clairbear99/saved.rss?limit=100")
     }
 
-    func testSavedFeedURLCarriesTheAfterCursor() {
-        let url = RedditSaved.feedURL(username: "u", limit: 100, after: "t3_abc")
+    func testSavedFeedURLCarriesTheAfterCursor() throws {
+        let url = try XCTUnwrap(RedditSaved.feedURL(username: "u", limit: 100, after: "t3_abc"))
         XCTAssertEqual(url.query, "limit=100&after=t3_abc")
     }
 
