@@ -21,10 +21,6 @@ final class RedditSession {
     private(set) var clearing = false
     /// Set when Reddit answers 401/403 with a cookie we believed was valid.
     private(set) var expired = false
-    /// Diagnostics: how many cookies the WebKit store actually holds, and their names.
-    /// Never the values — a session cookie must not reach anything user-readable.
-    private(set) var cookieCount = 0
-    private(set) var cookieNames: [String] = []
     /// Per-cookie verdict against the feed URL: attached by the policy, or dropped,
     /// and whether it is already expired. This is what turns "9 cookies" into a cause.
     private(set) var cookieReport: [CookieVerdict] = []
@@ -55,11 +51,13 @@ final class RedditSession {
         }
         if !valid { expired = false }
         hasSession = valid
-        cookieCount = cookies.count
-        cookieNames = cookies.map(\.name).sorted()
         let target = feedURL(subreddit: "feet")
+        // Only cookies this app could ever send to Reddit matter. Cloudflare's
+        // cf_clearance lives on another domain and is dropped by the policy, so
+        // showing it as a failure would be noise.
         cookieReport = cookies
             .sorted { $0.name < $1.name }
+            .filter { $0.domain.lowercased().contains("reddit.com") }
             .map { cookie in
                 CookieVerdict(
                     name: cookie.name,

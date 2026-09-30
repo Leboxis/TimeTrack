@@ -67,24 +67,21 @@ struct SettingsView: View {
                           systemImage: reddit.hasSession ? "checkmark.shield.fill" : "person.crop.circle.badge.questionmark")
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(reddit.hasSession ? Color.green : Color.secondary)
-                    LabeledContent("Cookies dans le magasin", value: "\(reddit.cookieCount)")
-                    if !reddit.cookieReport.isEmpty {
-                        ForEach(reddit.cookieReport) { verdict in
-                            HStack(spacing: 8) {
-                                Text(verdict.name).font(.caption2.monospaced())
-                                Spacer()
-                                if verdict.expired {
-                                    Text("expiré").font(.caption2).foregroundStyle(.orange)
-                                } else if verdict.attachable {
-                                    Image(systemName: "checkmark.circle.fill")
-                                        .font(.caption2).foregroundStyle(.green)
-                                } else {
-                                    Image(systemName: "xmark.circle")
-                                        .font(.caption2).foregroundStyle(.secondary)
-                                }
+                    ForEach(reddit.cookieReport) { verdict in
+                        HStack(spacing: 8) {
+                            Text(verdict.name).font(.caption2.monospaced())
+                            Spacer()
+                            if verdict.expired {
+                                Text("expiré").font(.caption2).foregroundStyle(.orange)
+                            } else if verdict.attachable {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .font(.caption2).foregroundStyle(.green)
+                            } else {
+                                Image(systemName: "xmark.circle")
+                                    .font(.caption2).foregroundStyle(.secondary)
                             }
-                            .textSelection(.enabled)
                         }
+                        .textSelection(.enabled)
                     }
                     Button(reddit.hasSession ? "Ouvrir Reddit" : "Se connecter à Reddit") {
                         loginPresented = true
@@ -97,7 +94,7 @@ struct SettingsView: View {
                 } header: {
                     Text("Reddit")
                 } footer: {
-                    Text("Coche verte : le cookie part avec les requêtes Reddit. Croix : écarté (domaine ou chemin). « expiré » : dépassé, Reddit l’ignore. Ta session Reddit est conservée dans le magasin de cookies du système, jamais dans les données de l’app. Elle donne accès à ton compte entier, pas seulement à la lecture. « Se déconnecter » l’efface.")
+                    Text("Session conservée dans le magasin de cookies du système, jamais dans les données de l’app. Elle donne accès à ton compte entier, pas seulement à la lecture. Les cookies hors domaine Reddit sont ignorés. « Se déconnecter » l’efface.")
                 }
                 Section {
                     ForEach(Array(diagnostics.lines.enumerated()), id: \.offset) { _, line in
