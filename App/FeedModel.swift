@@ -101,6 +101,33 @@ final class FeedModel {
         }
     }
 
+    /// Post fullnames the user saved from this app. Reddit's own saved list is the
+    /// source of truth on reddit.com; this is only what the app remembers so the heart
+    /// has a state to show.
+    private(set) var savedIDs: Set<String> = RedditAccount.savedSet(
+        from: UserDefaults.standard.string(forKey: "wellbeing.reddit.saved") ?? "[]")
+
+    func isSaved(_ postID: String) -> Bool { savedIDs.contains(postID) }
+
+    private(set) var savingPostID: String?
+    private(set) var saveErrorMessage: String?
+
+    /// Toggles the post in the signed-in account's Reddit saves.
+    func toggleSaved(postID: String) async {
+        guard savingPostID == nil else { return }
+        savingPostID = postID
+        saveErrorMessage = nil
+        let target = !savedIDs.contains(postID)
+        defer { savingPostID = nil }
+        do {
+            try await RedditSession.shared.setSaved(fullname: postID, saved: target)
+            if target { savedIDs.insert(postID) } else { savedIDs.remove(postID) }
+            UserDefaults.standard.set(RedditAccount.encodeSavedSet(savedIDs), forKey: "wellbeing.reddit.saved")
+        } catch {
+            saveErrorMessage = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+        }
+    }
+
     private func offlineMessage(for error: URLError) -> String {
         switch error.code {
         case .notConnectedToInternet, .networkConnectionLost, .timedOut,

@@ -58,6 +58,9 @@ struct SettingsView: View {
                           systemImage: reddit.hasSession ? "checkmark.shield.fill" : "person.crop.circle.badge.questionmark")
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(reddit.hasSession ? Color.green : Color.secondary)
+                    if let account = reddit.account {
+                        LabeledContent("Connecté en tant que", value: account.username)
+                    }
                     Button(reddit.hasSession ? "Ouvrir Reddit" : "Se connecter à Reddit") {
                         loginPresented = true
                     }

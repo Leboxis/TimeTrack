@@ -23,6 +23,11 @@ struct FeedView: View {
         return result
     }
 
+    private var current: FeedEntry? {
+        guard let visibleID else { return entries.first }
+        return entries.first { $0.id == visibleID } ?? entries.first
+    }
+
     var body: some View {
         ZStack {
             Color.black.ignoresSafeArea()
@@ -97,6 +102,22 @@ struct FeedView: View {
                             .background(.ultraThinMaterial, in: Capsule())
                     }
                     Spacer()
+                    if let current {
+                        let isSaved = model.isSaved(current.post.id)
+                        Button {
+                            Task { await model.toggleSaved(postID: current.post.id) }
+                        } label: {
+                            Label(isSaved ? "Retirer des sauvegardes" : "Enregistrer",
+                                  systemImage: isSaved ? "heart.fill" : "heart")
+                                .labelStyle(.iconOnly)
+                                .font(.subheadline.weight(.semibold))
+                                .padding(.horizontal, 14).padding(.vertical, 8)
+                                .background(.ultraThinMaterial, in: Capsule())
+                        }
+                        .foregroundStyle(isSaved ? .pink : .primary)
+                        .disabled(model.savingPostID != nil)
+                        .accessibilityLabel(isSaved ? "Retirer des sauvegardes Reddit" : "Enregistrer dans les sauvegardes Reddit")
+                    }
                     Button { model.load() } label: {
                         Label("Actualiser", systemImage: "arrow.clockwise")
                             .labelStyle(.iconOnly)
@@ -112,6 +133,14 @@ struct FeedView: View {
                 }
                 .padding()
                 Spacer()
+            }
+            if let message = model.saveErrorMessage {
+                Text(message)
+                    .font(.caption).foregroundStyle(.white)
+                    .padding(.horizontal, 12).padding(.vertical, 8)
+                    .background(.red.opacity(0.85), in: Capsule())
+                    .padding(.horizontal, 20)
+                    .padding(.bottom, 12)
             }
         }
         .task { model.load() }
