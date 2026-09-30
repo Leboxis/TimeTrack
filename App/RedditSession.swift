@@ -3,6 +3,13 @@ import Observation
 import WebKit
 import WellbeingCore
 
+struct CookieVerdict: Identifiable {
+    let name: String
+    let attachable: Bool
+    let expired: Bool
+    var id: String { name }
+}
+
 /// Holds the Reddit login session. The cookie lives in WebKit's own persistent store
 /// (`WKWebsiteDataStore.default()`), never in app-readable storage, exactly like the
 /// reference app. The app can only read it to build a request header.
@@ -18,6 +25,9 @@ final class RedditSession {
     /// Never the values — a session cookie must not reach anything user-readable.
     private(set) var cookieCount = 0
     private(set) var cookieNames: [String] = []
+    /// Per-cookie verdict against the feed URL: attached by the policy, or dropped,
+    /// and whether it is already expired. This is what turns "9 cookies" into a cause.
+    private(set) var cookieReport: [CookieVerdict] = []
 
     let store = WKWebsiteDataStore.default()
     private var observer: (any WKHTTPCookieStoreObserver)?
@@ -47,6 +57,15 @@ final class RedditSession {
         hasSession = valid
         cookieCount = cookies.count
         cookieNames = cookies.map(\.name).sorted()
+        let target = feedURL(subreddit: "feet")
+        cookieReport = cookies
+            .sorted { $0.name < $1.name }
+            .map { cookie in
+                CookieVerdict(
+                    name: cookie.name,
+                    attachable: RedditCookiePolicy.header(cookies: [cookie], for: target) != nil,
+                    expired: cookie.expiresDate.map { $0 <= Date() } ?? false)
+            }
     }
 
     func markExpired() {

@@ -101,14 +101,21 @@ final class FeedModel {
         var request = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData)
         request.setValue(Self.userAgent, forHTTPHeaderField: "User-Agent")
         for (key, value) in headers { request.setValue(value, forHTTPHeaderField: key) }
-        let cookie = await RedditSession.shared.cookieHeader(for: url)
-        if let cookie {
-            request.setValue(cookie, forHTTPHeaderField: "Cookie")
-            if url.host?.hasSuffix("reddit.com") == true {
-                FeedDiagnostics.shared.record("cookie attaché : \(cookieNames(cookie).joined(separator: ", "))")
+        var cookie = await RedditSession.shared.cookieHeader(for: url)
+        if url.host?.hasSuffix("reddit.com") == true {
+            // Reddit gates NSFW subreddit feeds on the `over18` consent cookie, which
+            // the login WebView never sets on its own. The user's account is
+            // adult-enabled; asserting it here mirrors what the web interstitial does.
+            let names = cookieNames(cookie ?? "")
+            if !names.contains("over18") {
+                cookie = [cookie, "over18=1"].compactMap { $0 }.joined(separator: "; ")
             }
-        } else if url.host?.hasSuffix("reddit.com") == true {
-            FeedDiagnostics.shared.record("aucun cookie attaché")
+            if let cookie {
+                request.setValue(cookie, forHTTPHeaderField: "Cookie")
+                FeedDiagnostics.shared.record("cookie attaché : \(cookieNames(cookie).joined(separator: ", "))")
+            } else {
+                FeedDiagnostics.shared.record("aucun cookie attaché")
+            }
         }
         return try await session.data(for: request)
     }
