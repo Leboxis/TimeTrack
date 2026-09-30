@@ -128,7 +128,7 @@ public enum MediaExtractor {
     public static func extract(_ html: String) -> [Media] {
         let ns = html as NSString
         var seen = Set<Media>()
-        return hrefRegex.matches(in: html, range: NSRange(location: 0, length: ns.length)).compactMap { match in
+        let linked = hrefRegex.matches(in: html, range: NSRange(location: 0, length: ns.length)).compactMap { match -> Media? in
             let raw = ns.substring(with: match.range(at: 1)).replacingOccurrences(of: "&amp;", with: "&")
             guard let url = URL(string: raw), url.scheme == "https", let host = url.host?.lowercased() else { return nil }
             var media: Media?
@@ -146,6 +146,23 @@ public enum MediaExtractor {
             guard let media, seen.insert(media).inserted else { return nil }
             return media
         }
+        if !linked.isEmpty { return linked }
+
+        // Quarantined NSFW subreddits serve a feed whose entries only carry a
+        // preview.redd.it image and no original link. Accepting the preview keeps
+        // those posts playable instead of reporting an empty feed.
+        let previews = imgRegex.matches(in: html, range: NSRange(location: 0, length: ns.length)).compactMap { match -> Media? in
+            let raw = ns.substring(with: match.range(at: 1)).replacingOccurrences(of: "&amp;", with: "&")
+            guard var components = URLComponents(string: raw),
+                  components.scheme == "https",
+                  let host = components.host?.lowercased() else { return nil }
+            guard ["preview.redd.it", "external-preview.redd.it"].contains(host) else { return nil }
+            components.host = "i.redd.it"
+            guard let original = components.url, original.pathExtension.lowercased() != "" else { return nil }
+            guard seen.insert(.direct(original)).inserted else { return nil }
+            return .direct(original)
+        }
+        return previews
     }
 }
 

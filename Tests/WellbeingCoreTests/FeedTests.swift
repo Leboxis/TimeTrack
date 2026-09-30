@@ -58,6 +58,21 @@ final class FeedTests: XCTestCase {
         XCTAssertEqual(media.count, 3)
     }
 
+    func testExtractFallsBackToPreviewForQuarantinedFeeds() {
+        // Exactly the shape a quarantined NSFW feed serves: an escaped <img> from
+        // preview.redd.it and no original i.redd.it link.
+        let html = "&lt;a href=&quot;https://www.reddit.com/r/feet/comments/abc/x/&quot;&gt; " +
+                   "&lt;img src=&quot;https://preview.redd.it/photo.jpeg?width=640&amp;amp;auto=webp&amp;amp;s=zz&quot;&gt;"
+        let media = MediaExtractor.extract(html)
+        XCTAssertEqual(media, [.direct(URL(string: "https://i.redd.it/photo.jpeg")!)])
+    }
+
+    func testExtractDoesNotTrustForeignPreviewHosts() {
+        let html = "&lt;img src=&quot;https://preview.redd.it.evil.example/photo.jpeg&quot;&gt; " +
+                   "&lt;img src=&quot;http://preview.redd.it/photo.jpeg&quot;&gt;"
+        XCTAssertTrue(MediaExtractor.extract(html).isEmpty)
+    }
+
     func testStripsImgurSuffixAndBuildsGalleryURL() {
         XCTAssertEqual(
             QualityPolicy.originalImageURL(URL(string: "https://i.imgur.com/Ab12Cd3l.jpg")!).absoluteString,
