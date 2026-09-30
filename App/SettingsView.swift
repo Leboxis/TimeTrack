@@ -67,6 +67,13 @@ struct SettingsView: View {
                           systemImage: reddit.hasSession ? "checkmark.shield.fill" : "person.crop.circle.badge.questionmark")
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(reddit.hasSession ? Color.green : Color.secondary)
+                    LabeledContent("Cookies dans le magasin", value: "\(reddit.cookieCount)")
+                    if !reddit.cookieNames.isEmpty {
+                        Text(reddit.cookieNames.joined(separator: ", "))
+                            .font(.caption2.monospaced())
+                            .foregroundStyle(.secondary)
+                            .textSelection(.enabled)
+                    }
                     Button(reddit.hasSession ? "Ouvrir Reddit" : "Se connecter à Reddit") {
                         loginPresented = true
                     }

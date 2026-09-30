@@ -14,6 +14,10 @@ final class RedditSession {
     private(set) var clearing = false
     /// Set when Reddit answers 401/403 with a cookie we believed was valid.
     private(set) var expired = false
+    /// Diagnostics: how many cookies the WebKit store actually holds, and their names.
+    /// Never the values — a session cookie must not reach anything user-readable.
+    private(set) var cookieCount = 0
+    private(set) var cookieNames: [String] = []
 
     let store = WKWebsiteDataStore.default()
     private var observer: (any WKHTTPCookieStoreObserver)?
@@ -41,6 +45,8 @@ final class RedditSession {
         }
         if !valid { expired = false }
         hasSession = valid
+        cookieCount = cookies.count
+        cookieNames = cookies.map(\.name).sorted()
     }
 
     func markExpired() {
