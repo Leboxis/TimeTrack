@@ -97,11 +97,22 @@ public enum KDriveClient {
 
     public static func listURL(config: KDriveConfig, directoryID: String, cursor: String?) -> URL {
         var components = URLComponents(string: "\(base)/3/drive/\(config.driveID)/files/\(directoryID)/files")!
-        var items = [URLQueryItem(name: "limit", value: String(pageLimit))]
-        if let cursor, !cursor.isEmpty { items.append(URLQueryItem(name: "cursor", value: cursor)) }
-        components.queryItems = items
+        var query = "limit=\(pageLimit)"
+        if let cursor, !cursor.isEmpty {
+            // Strict encoding: URLQueryItem would leave `+` literal, and many servers
+            // read `+` in a query as a space, which would corrupt an opaque cursor.
+            let encoded = cursor.addingPercentEncoding(withAllowedCharacters: strictQueryAllowed) ?? cursor
+            query += "&cursor=\(encoded)"
+        }
+        components.percentEncodedQuery = query
         return components.url!
     }
+
+    private static let strictQueryAllowed: CharacterSet = {
+        var set = CharacterSet.alphanumerics
+        set.insert(charactersIn: "-._~")
+        return set
+    }()
 
     /// Not present in the reference app: it has no download, stream or thumbnail path.
     /// Derived from the shapes it does use, so it is the one assumption in this feature.
