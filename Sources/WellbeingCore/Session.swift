@@ -147,6 +147,24 @@ public struct TimerDraft: Codable, Equatable {
     }
 }
 
+/// The five bands a 1-5 rating falls into.
+///
+/// Deliberately free of SwiftUI: the clamping rule is the part worth testing, and it
+/// lives in the package where `swift test` can reach it. The colour itself belongs to
+/// the app layer.
+public enum RatingBand: Int, CaseIterable, Sendable {
+    case lowest = 1, low, middle, high, highest
+
+    /// Out-of-range ratings are clamped to an end rather than rejected, so a legacy or
+    /// hand-edited record still gets a colour instead of none.
+    public init(value: Int) {
+        self = RatingBand(rawValue: min(5, max(1, value))) ?? .middle
+    }
+
+    /// Position along the red-to-green ramp, 0...1.
+    public var intensity: Double { Double(rawValue - 1) / 4 }
+}
+
 public func durationLabel(_ seconds: TimeInterval) -> String {
     let total = Int(min(86_400, max(0, seconds.isFinite ? seconds : 0)))
     if total >= 3600 { return String(format: "%d:%02d:%02d", total / 3600, total / 60 % 60, total % 60) }

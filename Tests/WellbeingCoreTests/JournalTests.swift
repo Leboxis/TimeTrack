@@ -159,4 +159,38 @@ final class JournalTests: XCTestCase {
         timer.start(at: Date(timeIntervalSince1970: 0))
         XCTAssertEqual(timer.elapsed(at: Date(timeIntervalSince1970: 100_000)), 86_400)
     }
+
+    // MARK: - Rating bands
+
+    func testRatingBandsCoverTheScale() {
+        XCTAssertEqual(RatingBand.allCases.map(\.rawValue), [1, 2, 3, 4, 5])
+    }
+
+    func testRatingBandMapsTheFiveRatings() {
+        XCTAssertEqual(RatingBand(value: 1), .lowest)
+        XCTAssertEqual(RatingBand(value: 2), .low)
+        XCTAssertEqual(RatingBand(value: 3), .middle)
+        XCTAssertEqual(RatingBand(value: 4), .high)
+        XCTAssertEqual(RatingBand(value: 5), .highest)
+    }
+
+    /// A rating outside the scale must still produce a band, otherwise a legacy or
+    /// hand-edited record loses its colour entirely instead of being pinned to an end.
+    func testRatingBandClampsOutOfRangeValues() {
+        XCTAssertEqual(RatingBand(value: 0), .lowest)
+        XCTAssertEqual(RatingBand(value: -99), .lowest)
+        XCTAssertEqual(RatingBand(value: 6), .highest)
+        XCTAssertEqual(RatingBand(value: 99), .highest)
+    }
+
+    /// The ramp runs from 0 to 1 across the five bands, which is what lets the colour
+    /// be interpolated once instead of hard-coded per value.
+    func testRatingBandIntensitySpansZeroToOne() {
+        XCTAssertEqual(RatingBand.lowest.intensity, 0)
+        XCTAssertEqual(RatingBand.middle.intensity, 0.5, accuracy: 0.0001)
+        XCTAssertEqual(RatingBand.highest.intensity, 1)
+        for band in RatingBand.allCases {
+            XCTAssertTrue((0...1).contains(band.intensity))
+        }
+    }
 }

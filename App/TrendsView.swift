@@ -217,15 +217,16 @@ private struct SessionChart: View {
             Text(metric.title).font(.title3.bold())
             Chart {
                 ForEach(sessions) { session in
-                    if metric == .duration {
-                        LineMark(x: .value("Date", session.date), y: .value(metric.axisLabel, metric.value(session)))
-                            .foregroundStyle(metric.color)
-                    }
+                    // Every metric is a series over time, so every metric gets its line.
+                    // Only the durations used to be drawn connected, which left the three
+                    // ratings as unlinked dots with no readable trend between them.
+                    LineMark(x: .value("Date", session.date), y: .value(metric.axisLabel, metric.value(session)))
+                        .foregroundStyle(metric.color)
                     PointMark(x: .value("Date", session.date), y: .value(metric.axisLabel, metric.value(session)))
                         .foregroundStyle(metric.color)
                         .symbolSize(selectedID == session.id ? 140 : 35)
                         .accessibilityLabel(session.date.formatted(date: .abbreviated, time: .shortened))
-                        .accessibilityValue(metric == .duration ? durationLabel(session.duration) : "\(session.feeling) sur 5")
+                        .accessibilityValue(metric == .duration ? durationLabel(session.duration) : "\(metric.value(session)) sur 5")
                 }
                 if let selected {
                     RuleMark(x: .value("Sélection", selected.date))

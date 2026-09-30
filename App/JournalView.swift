@@ -40,7 +40,8 @@ struct JournalView: View {
                                 Text(session.date, format: .dateTime.day().month(.wide).year())
                                     .font(.headline).foregroundStyle(.primary)
                                 Spacer()
-                                Text(durationLabel(session.duration)).font(.headline.monospacedDigit()).foregroundStyle(.teal)
+                                Text(durationLabel(session.duration)).font(.headline.monospacedDigit())
+                                    .foregroundStyle(RatingPalette.duration)
                             }
                             HStack {
                                 Text(session.date, format: .dateTime.hour().minute())
@@ -48,19 +49,32 @@ struct JournalView: View {
                                 Label("\(session.feeling)/5", systemImage: "heart")
                             }.font(.caption).foregroundStyle(.secondary)
                             HStack(spacing: 6) {
-                                chip("Ressenti \(session.feeling)/5")
-                                chip("Orgasme \(session.orgasm)/5")
-                                chip("Mental \(session.mental)/5")
-                                chip(session.ejaculation.label)
+                                // Same band as the stripe, so the row's colour and the
+                                // rating it reports can never disagree.
+                                chip("Ressenti \(session.feeling)/5", RatingPalette.ramp(session.feeling))
+                                chip("Orgasme \(session.orgasm)/5", RatingPalette.orgasm)
+                                chip("Mental \(session.mental)/5", RatingPalette.mental)
+                                chip(session.ejaculation.label, RatingPalette.ejaculation)
                             }
                             if !session.notes.isEmpty {
                                 Text(session.notes).font(.subheadline).foregroundStyle(.secondary).lineLimit(2)
                             }
-                        }.padding(.vertical, 6)
+                        }
+                        .padding(.vertical, 6)
+                        .padding(.leading, 16)
+                        .background(alignment: .leading) {
+                            Rectangle()
+                                .fill(RatingPalette.rampTint(session.feeling))
+                                .frame(width: 4)
+                        }
                     }
                     .swipeActions {
                         Button("Supprimer", role: .destructive) { deleting = session }
                     }
+                    // The value stays in the text, so the colour never carries the
+                    // rating on its own.
+                    .accessibilityElement(children: .combine)
+                    .accessibilityLabel(accessibilitySummary(session))
                 }
             }
             .navigationTitle("Journal")
@@ -91,10 +105,26 @@ struct JournalView: View {
         }
     }
 
-    private func chip(_ text: String) -> some View {
+    /// Soft tint behind the label, text left at the default colour so the rating stays
+    /// readable rather than fighting a saturated foreground.
+    private func chip(_ text: String, _ color: Color) -> some View {
         Text(text)
             .font(.caption2.weight(.medium))
+            .foregroundStyle(.primary)
             .padding(.horizontal, 7).padding(.vertical, 3)
-            .background(Color.teal.opacity(0.12), in: Capsule())
+            .background(color.opacity(0.12), in: Capsule())
+    }
+
+    private func accessibilitySummary(_ session: Session) -> String {
+        var parts = [
+            session.date.formatted(date: .long, time: .shortened),
+            durationLabel(session.duration),
+            "ressenti \(session.feeling) sur 5",
+            "orgasme \(session.orgasm) sur 5",
+            "ressenti mental \(session.mental) sur 5",
+            "type d'éjaculation : \(session.ejaculation.label)",
+        ]
+        if !session.notes.isEmpty { parts.append(session.notes) }
+        return parts.joined(separator: ", ")
     }
 }

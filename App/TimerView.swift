@@ -9,52 +9,49 @@ struct TimerView: View {
     @State private var confirmReset = false
     @State private var savingTimer = false
 
+    private var isRunning: Bool { timer.draft.startedAt != nil }
+
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(spacing: 28) {
-                    VStack(spacing: 8) {
-                        Image(systemName: "leaf.circle.fill").font(.system(size: 48)).foregroundStyle(.teal)
-                        Text("Un moment pour vous").font(.title2.bold())
-                        Text("Observez votre ressenti, à votre rythme.")
-                            .foregroundStyle(.secondary).multilineTextAlignment(.center)
+                VStack(spacing: 24) {
+                    // The periodic timeline never stopped: a `TabView` keeps its
+                    // children alive, so a once-a-second redraw ran for the whole
+                    // session, on another tab, with the screen held awake. It now wraps
+                    // the dial alone, and only while the scene is frontmost.
+                    if scenePhase == .active {
+                        TimelineView(.periodic(from: .now, by: 1)) { context in
+                            TimerDial(elapsed: timer.draft.elapsed(at: context.date),
+                                      isRunning: isRunning,
+                                      animates: true)
+                        }
+                    } else {
+                        TimerDial(elapsed: timer.draft.elapsed(), isRunning: isRunning, animates: false)
                     }
-                    .padding(.top, 24)
 
-                    VStack(spacing: 20) {
-                        // The periodic timeline never stopped: a `TabView` keeps its
-                        // children alive, so a once-a-second redraw ran for the whole
-                        // session, on another tab, with the screen held awake.
-                        if scenePhase == .active {
-                            TimelineView(.periodic(from: .now, by: 1)) { context in
-                                elapsedLabel(at: context.date)
-                            }
-                        } else {
-                            elapsedLabel(at: Date())
-                        }
-                        Text(timer.draft.startedAt == nil ? "À votre rythme" : "Séance en cours")
-                            .font(.subheadline).foregroundStyle(.secondary)
-                        Button {
-                            timer.toggle()
-                        } label: {
-                            Label(timer.draft.startedAt == nil ? "Démarrer / reprendre" : "Pause",
-                                  systemImage: timer.draft.startedAt == nil ? "play.fill" : "pause.fill")
-                                .frame(maxWidth: .infinity).padding(.vertical, 8)
-                        }
-                        .buttonStyle(.borderedProminent).controlSize(.large)
-
-                        Button {
-                            timer.pause()
-                            savingTimer = true
-                            draftSession = Session(duration: max(1, timer.draft.elapsed()))
-                        } label: {
-                            Label("Terminer et noter", systemImage: "checkmark.circle")
-                                .frame(maxWidth: .infinity).padding(.vertical, 6)
-                        }
-                        .buttonStyle(.bordered)
-                        .disabled((timer.draft.startedAt == nil && timer.draft.accumulated == 0) || store.loadFailed)
+                    Button { timer.toggle() } label: {
+                        Image(systemName: isRunning ? "pause.fill" : "play.fill")
+                            .font(.system(size: 26, weight: .semibold))
+                            .foregroundStyle(.white)
+                            .frame(width: 72, height: 72)
+                            .background(RatingPalette.duration, in: Circle())
                     }
-                    .padding(24).background(.teal.opacity(0.08), in: RoundedRectangle(cornerRadius: 28))
+                    .accessibilityLabel(isRunning ? "Mettre en pause" : "Démarrer ou reprendre")
+
+                    Button {
+                        timer.pause()
+                        savingTimer = true
+                        draftSession = Session(duration: max(1, timer.draft.elapsed()))
+                    } label: {
+                        Label("Terminer et noter", systemImage: "checkmark.circle")
+                            .frame(maxWidth: .infinity).padding(.vertical, 6)
+                    }
+                    .buttonStyle(.borderedProminent).controlSize(.large)
+                    .disabled((!isRunning && timer.draft.accumulated == 0) || store.loadFailed)
+
+                    Text("Un moment pour vous. Observez votre ressenti, à votre rythme.")
+                        .font(.subheadline).foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
 
                     HStack {
                         Button("Réinitialiser", role: .destructive) { confirmReset = true }
@@ -69,10 +66,11 @@ struct TimerView: View {
                         Text("Le journal n’a pas pu être lu en entier. Ouvrez Réglages pour exporter les séances récupérées ou réinitialiser le fichier local.")
                             .font(.footnote).foregroundStyle(.red)
                     }
-                }.padding(.horizontal, 20).padding(.bottom, 24)
+                }.padding(.horizontal, 20).padding(.vertical, 24)
                 .frame(maxWidth: 600).frame(maxWidth: .infinity)
             }
-            .navigationTitle("Wellbeing")
+            .navigationTitle("Séance")
+            .navigationBarTitleDisplayMode(.inline)
             .sheet(item: $draftSession) { session in
                 SessionEditor(session: session) { saved in
                     if store.save(saved) {
@@ -87,13 +85,5 @@ struct TimerView: View {
                 Button("Annuler", role: .cancel) {}
             }
         }
-    }
-
-    private func elapsedLabel(at date: Date) -> some View {
-        let label = durationLabel(timer.draft.elapsed(at: date))
-        return Text(label)
-            .font(.system(size: 64, weight: .light, design: .rounded))
-            .monospacedDigit().minimumScaleFactor(0.5).lineLimit(1)
-            .accessibilityLabel("Durée : \(label)")
     }
 }
