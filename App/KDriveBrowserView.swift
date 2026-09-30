@@ -1,3 +1,4 @@
+import ImageIO
 import SwiftUI
 import UIKit
 import WellbeingCore
@@ -8,13 +9,18 @@ struct KDrivePathNode: Identifiable, Hashable {
     let name: String
 }
 
-/// Grid of kDrive items: folders plus media with their kDrive thumbnail.
+/// Grid of kDrive items. Every tile has the same geometry whatever the media, so the
+/// name always sits in its own band and never overlaps a neighbour.
 struct KDriveBrowserView: View {
     @State private var model = KDriveModel()
     @State private var path: [KDrivePathNode] = [KDrivePathNode(id: "1", name: "Racine")]
     @State private var playing: MediaItem?
+    @State private var watching: MediaItem?
 
-    private let columns = [GridItem(.adaptive(minimum: 104, maximum: 160), spacing: 12)]
+    private let spacing: CGFloat = 10
+    private let padding: CGFloat = 12
+    private let minimumTile: CGFloat = 118
+    private let labelHeight: CGFloat = 30
 
     private var current: KDrivePathNode { path[path.count - 1] }
 
@@ -44,55 +50,79 @@ struct KDriveBrowserView: View {
         }
         .task(id: current.id) { await model.load(directoryID: current.id) }
         .sheet(item: $playing) { MediaPlayerView(item: $0) }
+        .fullScreenCover(item: $watching) { VideoPlayerScreen(item: $0) }
         .privacyMask()
     }
 
     private var grid: some View {
-        ScrollView {
-            LazyVGrid(columns: columns, spacing: 12) {
-                ForEach(model.items) { item in
-                    if item.isDirectory {
-                        Button {
-                            path.append(KDrivePathNode(id: String(item.id), name: item.name))
-                        } label: {
-                            tile {
-                                VStack(spacing: 6) {
-                                    Image(systemName: "folder.fill").font(.title2)
-                                    Text(item.name).font(.caption).lineLimit(2)
-                                }
-                                .foregroundStyle(.teal)
-                            }
-                        }
-                    } else if item.mediaKind != nil {
-                        Button { open(item) } label: {
-                            tile {
-                                KDriveThumbnail(url: KDriveClient.thumbnailURL(config: model.config, fileID: item.id),
-                                                 token: model.config.token)
-                                Text(item.name).font(.caption2).lineLimit(2)
-                                    .foregroundStyle(.primary).padding(.top, 4)
-                            }
-                        }
-                    } else {
-                        tile {
-                            VStack(spacing: 6) {
-                                Image(systemName: "doc").font(.title2)
-                                Text(item.name).font(.caption2).lineLimit(2)
-                            }
-                            .foregroundStyle(.secondary)
-                        }
-                        .opacity(0.6)
+        GeometryReader { proxy in
+            let count = max(2, Int((proxy.size.width - 2 * padding + spacing) / (minimumTile + spacing)))
+            let tile = (proxy.size.width - 2 * padding - spacing * CGFloat(count - 1)) / CGFloat(count)
+            ScrollView {
+                LazyVGrid(columns: Array(repeating: GridItem(.fixed(tile), spacing: spacing), count: count),
+                          spacing: spacing) {
+                    ForEach(model.items) { item in
+                        cell(item, size: tile)
                     }
                 }
+                .padding(padding)
             }
-            .padding(12)
         }
     }
 
-    private func tile<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
-        content()
-            .frame(maxWidth: .infinity, minHeight: 104)
-            .padding(8)
-            .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 12))
+    @ViewBuilder
+    private func cell(_ item: KDriveItem, size: CGFloat) -> some View {
+        let media: AnyView
+        if item.isDirectory {
+            media = AnyView(
+                Image(systemName: "folder.fill")
+                    .font(.system(size: 30))
+                    .foregroundStyle(.teal)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity))
+        } else if item.mediaKind != nil {
+            media = AnyView(
+                KDriveThumbnail(url: KDriveClient.thumbnailURL(config: model.config, fileID: item.id),
+                                token: model.config.token, maxPixels: Int(size * 3))
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .clipped())
+        } else {
+            media = AnyView(
+                Image(systemName: "doc")
+                    .font(.system(size: 26))
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity))
+        }
+
+        VStack(spacing: 0) {
+            media
+                .frame(height: size)
+                .frame(maxWidth: .infinity)
+            Text(item.name)
+                .font(.caption2)
+                .foregroundStyle(item.isDirectory ? .primary : .secondary)
+                .lineLimit(2, reservesSpace: true)
+                .multilineTextAlignment(.center)
+                .frame(height: labelHeight, alignment: .top)
+                .padding(.top, 5)
+        }
+        .frame(width: size)
+        .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 12))
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .overlay(alignment: .topTrailing) {
+            if item.mediaKind == .video {
+                Image(systemName: "play.circle.fill")
+                    .font(.caption)
+                    .foregroundStyle(.white, .black.opacity(0.4))
+                    .padding(6)
+            }
+        }
+        .onTapGesture {
+            if item.isDirectory {
+                path.append(KDrivePathNode(id: String(item.id), name: item.name))
+            } else {
+                open(item)
+            }
+        }
     }
 
     private var breadcrumb: some View {
@@ -116,19 +146,26 @@ struct KDriveBrowserView: View {
     private func open(_ item: KDriveItem) {
         guard let kind = item.mediaKind else { return }
         let mediaKind: MediaKind = kind == .image ? .image : (kind == .audio ? .audio : .video)
-        playing = MediaItem(
+        let entry = MediaItem(
             id: "kdrive-\(item.id)", title: item.name, subtitle: "kDrive",
             kind: mediaKind, resource: nil,
             url: KDriveClient.downloadURL(config: model.config, fileID: item.id),
-            // Resolved to a signed URL first, then streamed by the player. AVPlayer
-            // handles the redirect chain itself, so no bytes pass through the app.
+            // Resolved to a signed URL, then streamed. AVPlayer handles the redirect
+            // chain and ranges the file, so no bytes pass through the app.
             streamURL: { try await self.model.streamURL(for: item) })
+        if kind == .video {
+            watching = entry
+        } else {
+            playing = entry
+        }
     }
 }
 
+/// Square thumbnail, decoded downsampled so a large source never bloats memory.
 private struct KDriveThumbnail: View {
     let url: URL
     let token: String
+    let maxPixels: Int
     @State private var image: UIImage?
 
     var body: some View {
@@ -139,8 +176,7 @@ private struct KDriveThumbnail: View {
                 Image(systemName: "photo").foregroundStyle(.tertiary)
             }
         }
-        .frame(height: 88)
-        .frame(maxWidth: .infinity)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .clipped()
         .task(id: url) {
             guard image == nil else { return }
@@ -148,7 +184,13 @@ private struct KDriveThumbnail: View {
             request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
             guard let (data, response) = try? await URLSession.shared.data(for: request),
                   let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode),
-                  let loaded = UIImage(data: data), !Task.isCancelled else { return }
+                  let source = CGImageSourceCreateWithData(data as CFData, nil),
+                  let cg = CGImageSourceCreateThumbnailAtIndex(source, 0, [
+                      kCGImageSourceCreateThumbnailFromImageAlways: true,
+                      kCGImageSourceCreateThumbnailWithTransform: true,
+                      kCGImageSourceThumbnailMaxPixelSize: max(64, maxPixels)
+                  ] as CFDictionary),
+                  let loaded = UIImage(cgImage: cg), !Task.isCancelled else { return }
             image = loaded
         }
     }
