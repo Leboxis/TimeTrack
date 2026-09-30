@@ -22,8 +22,10 @@ final class RedditSession {
     private var refreshTask: Task<Void, Never>?
 
     private init() {
+        // The hop has to happen here: `cookiesDidChange` is a `nonisolated` delegate
+        // callback, and `scheduleRefresh` is main-actor-isolated.
         let observer = CookieObserver { [weak self] in
-            self?.scheduleRefresh()
+            Task { @MainActor in self?.scheduleRefresh() }
         }
         self.observer = observer
         store.httpCookieStore.add(observer)
