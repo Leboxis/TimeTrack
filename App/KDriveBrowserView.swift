@@ -72,31 +72,11 @@ struct KDriveBrowserView: View {
 
     @ViewBuilder
     private func cell(_ item: KDriveItem, size: CGFloat) -> some View {
-        let media: AnyView
-        if item.isDirectory {
-            media = AnyView(
-                Image(systemName: "folder.fill")
-                    .font(.system(size: 30))
-                    .foregroundStyle(.teal)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity))
-        } else if item.mediaKind != nil {
-            media = AnyView(
-                KDriveThumbnail(url: KDriveClient.thumbnailURL(config: model.config, fileID: item.id),
-                                token: model.config.token, maxPixels: Int(size * 3))
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .clipped())
-        } else {
-            media = AnyView(
-                Image(systemName: "doc")
-                    .font(.system(size: 26))
-                    .foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity))
-        }
-
         VStack(spacing: 0) {
-            media
+            mediaArea(for: item, size: size)
                 .frame(height: size)
                 .frame(maxWidth: .infinity)
+                .clipped()
             Text(item.name)
                 .font(.caption2)
                 .foregroundStyle(item.isDirectory ? .primary : .secondary)
@@ -116,12 +96,31 @@ struct KDriveBrowserView: View {
                     .padding(6)
             }
         }
+        .contentShape(Rectangle())
         .onTapGesture {
             if item.isDirectory {
                 path.append(KDrivePathNode(id: String(item.id), name: item.name))
             } else {
                 open(item)
             }
+        }
+    }
+
+    @ViewBuilder
+    private func mediaArea(for item: KDriveItem, size: CGFloat) -> some View {
+        if item.isDirectory {
+            Image(systemName: "folder.fill")
+                .font(.system(size: 30))
+                .foregroundStyle(.teal)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+        } else if item.mediaKind != nil {
+            KDriveThumbnail(url: KDriveClient.thumbnailURL(config: model.config, fileID: item.id),
+                            token: model.config.token, maxPixels: Int(size * 3))
+        } else {
+            Image(systemName: "doc")
+                .font(.system(size: 26))
+                .foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
     }
 
@@ -191,7 +190,7 @@ private struct KDriveThumbnail: View {
                       kCGImageSourceThumbnailMaxPixelSize: max(64, maxPixels)
                   ] as CFDictionary),
                   let loaded = UIImage(cgImage: cg), !Task.isCancelled else { return }
-            image = loaded
+            self.image = loaded
         }
     }
 }
