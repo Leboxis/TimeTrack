@@ -2,6 +2,7 @@ import SwiftUI
 import WellbeingCore
 
 struct FeedView: View {
+    @Environment(\.dismiss) private var dismiss
     @State private var model = FeedModel()
     @State private var visibleID: String?
 
@@ -55,6 +56,13 @@ struct FeedView: View {
             }
             VStack {
                 HStack {
+                    Button { dismiss() } label: {
+                        Label("Fermer", systemImage: "chevron.down")
+                            .labelStyle(.iconOnly)
+                            .font(.subheadline.weight(.semibold))
+                            .padding(.horizontal, 14).padding(.vertical, 8)
+                            .background(.ultraThinMaterial, in: Capsule())
+                    }
                     Menu {
                         ForEach(FeedLevel.allCases, id: \.self) { level in
                             Menu(level.title) {
@@ -102,6 +110,6 @@ struct FeedView: View {
                 visibleID = entries.first?.id
             }
         }
-        .navigationBarTitleDisplayMode(.inline)
+        .privacyMask()
     }
 }

@@ -1,17 +1,15 @@
 import SwiftUI
 
 struct MethodListView: View {
-    @Binding var hidesTabBar: Bool
     private let methods = MethodCatalog.all
+    @State private var showsFeed = false
 
     var body: some View {
         NavigationStack {
             List {
                 Section {
-                    NavigationLink {
-                        FeedView()
-                            .onAppear { hidesTabBar = true }
-                            .onDisappear { hidesTabBar = false }
+                    Button {
+                        showsFeed = true
                     } label: {
                         Label("Flux", systemImage: "play.rectangle")
                     }
@@ -47,5 +45,6 @@ struct MethodListView: View {
             }
             .navigationTitle("Méthode")
         }
+        .fullScreenCover(isPresented: $showsFeed) { FeedView() }
     }
 }
