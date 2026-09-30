@@ -190,7 +190,9 @@ struct MediaPlayerView: View {
     }
 
     private static func knownDuration(of player: AVPlayer) -> Double {
-        let seconds = player.currentItem?.asset.duration.seconds ?? 0
+        // `AVPlayerItem.duration`, not `AVAsset.duration`: the latter is deprecated since
+        // iOS 16 and its replacement is an async load, which does not fit an observer.
+        let seconds = player.currentItem?.duration.seconds ?? 0
         return (seconds.isFinite && seconds > 0) ? seconds : 0
     }
 

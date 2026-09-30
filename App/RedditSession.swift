@@ -141,8 +141,12 @@ final class RedditSession {
 }
 
 private final class CookieObserver: NSObject, WKHTTPCookieStoreObserver {
-    private let onChange: () -> Void
-    init(onChange: @escaping () -> Void) { self.onChange = onChange }
+    /// Typed `@Sendable` rather than inferred: the closure is built inside a
+    /// `@MainActor` initialiser, so without the annotation its type stayed
+    /// main-actor-isolated and calling it from the `nonisolated` delegate callback was
+    /// a warning here and an error under the Swift 6 language mode.
+    private let onChange: @Sendable () -> Void
+    init(onChange: @escaping @Sendable () -> Void) { self.onChange = onChange }
 
     nonisolated func cookiesDidChange(in cookieStore: WKHTTPCookieStore) {
         onChange()
