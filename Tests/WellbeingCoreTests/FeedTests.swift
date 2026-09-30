@@ -59,17 +59,17 @@ final class FeedTests: XCTestCase {
     }
 
     func testExtractFallsBackToPreviewForQuarantinedFeeds() {
-        // Exactly the shape a quarantined NSFW feed serves: an escaped <img> from
-        // preview.redd.it and no original i.redd.it link.
-        let html = "&lt;a href=&quot;https://www.reddit.com/r/feet/comments/abc/x/&quot;&gt; " +
-                   "&lt;img src=&quot;https://preview.redd.it/photo.jpeg?width=640&amp;amp;auto=webp&amp;amp;s=zz&quot;&gt;"
+        // Exactly the shape a quarantined NSFW feed serves after entity decoding:
+        // a preview.redd.it <img> inside an escaped content blob, no original link.
+        let html = "<a href=\"https://www.reddit.com/r/feet/comments/abc/x/\"> " +
+                   "<img src=\"https://preview.redd.it/photo.jpeg?width=640&amp;auto=webp&amp;s=zz\">"
         let media = MediaExtractor.extract(html)
         XCTAssertEqual(media, [.direct(URL(string: "https://i.redd.it/photo.jpeg")!)])
     }
 
     func testExtractDoesNotTrustForeignPreviewHosts() {
-        let html = "&lt;img src=&quot;https://preview.redd.it.evil.example/photo.jpeg&quot;&gt; " +
-                   "&lt;img src=&quot;http://preview.redd.it/photo.jpeg&quot;&gt;"
+        let html = "<img src=\"https://preview.redd.it.evil.example/photo.jpeg\"> " +
+                   "<img src=\"http://preview.redd.it/photo.jpeg\">"
         XCTAssertTrue(MediaExtractor.extract(html).isEmpty)
     }
 

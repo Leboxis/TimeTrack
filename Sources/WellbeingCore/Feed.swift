@@ -150,7 +150,9 @@ public enum MediaExtractor {
 
         // Quarantined NSFW subreddits serve a feed whose entries only carry a
         // preview.redd.it image and no original link. Accepting the preview keeps
-        // those posts playable instead of reporting an empty feed.
+        // those posts playable instead of reporting an empty feed. The HTML arrives
+        // entity-decoded once, but its attribute values stay escaped, so a second
+        // unescape is what the reference applies before matching hosts.
         let previews = imgRegex.matches(in: html, range: NSRange(location: 0, length: ns.length)).compactMap { match -> Media? in
             let raw = ns.substring(with: match.range(at: 1)).replacingOccurrences(of: "&amp;", with: "&")
             guard var components = URLComponents(string: raw),
@@ -158,7 +160,7 @@ public enum MediaExtractor {
                   let host = components.host?.lowercased() else { return nil }
             guard ["preview.redd.it", "external-preview.redd.it"].contains(host) else { return nil }
             components.host = "i.redd.it"
-            guard let original = components.url, original.pathExtension.lowercased() != "" else { return nil }
+            guard let original = components.url, !original.pathExtension.isEmpty else { return nil }
             guard seen.insert(.direct(original)).inserted else { return nil }
             return .direct(original)
         }
