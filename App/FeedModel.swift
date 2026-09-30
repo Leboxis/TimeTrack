@@ -62,6 +62,7 @@ final class FeedModel {
             guard loadGeneration == mine else { return }
             posts = parsed
             hasMore = parsed.count >= 25
+            await refreshSavedIDs()
         } catch is CancellationError {
             // Superseded by a newer load; leave the previous posts in place.
         } catch let urlError as URLError where urlError.code == .cancelled {
@@ -101,13 +102,39 @@ final class FeedModel {
         }
     }
 
-    /// Post fullnames the user saved from this app. Reddit's own saved list is the
-    /// source of truth on reddit.com; this is only what the app remembers so the heart
-    /// has a state to show.
+    /// Post fullnames saved from this app, kept even if the remote list no longer has
+    /// them. Reddit's own list is merged in so saves made elsewhere are reflected.
     private(set) var savedIDs: Set<String> = RedditAccount.savedSet(
         from: UserDefaults.standard.string(forKey: "wellbeing.reddit.saved") ?? "[]")
 
+    private static let savedRefreshKey = "wellbeing.reddit.savedRefreshed"
+    private var didFetchSavedThisSession = false
+    private(set) var refreshingSaved = false
+
     func isSaved(_ postID: String) -> Bool { savedIDs.contains(postID) }
+
+    /// Fetches the whole saved list: one request, throttled to once per hour and never
+    /// more than once per session, so scrolling and paging the feed cost nothing extra.
+    func refreshSavedIDs(force: Bool = false) async {
+        guard !refreshingSaved, RedditSession.shared.hasSession else { return }
+        if !force {
+            if didFetchSavedThisSession { return }
+            let last = UserDefaults.standard.object(forKey: Self.savedRefreshKey) as? Date
+            guard RedditSaved.isStale(last) else { return }
+        }
+        refreshingSaved = true
+        defer {
+            refreshingSaved = false
+            didFetchSavedThisSession = true
+        }
+        do {
+            let remote = try await RedditSession.shared.savedIDs()
+            savedIDs = RedditSaved.merge(local: savedIDs, remote: remote)
+            UserDefaults.standard.set(Date(), forKey: Self.savedRefreshKey)
+        } catch {
+            // A failed sync must never clear the locally known saves.
+        }
+    }
 
     private(set) var savingPostID: String?
     private(set) var saveErrorMessage: String?

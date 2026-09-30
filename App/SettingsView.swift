@@ -22,6 +22,7 @@ struct SettingsView: View {
     @State private var confirmErase = false
     @State private var confirmReset = false
     @State private var reddit = RedditSession.shared
+    @State private var syncModel = FeedModel()
     @State private var loginPresented = false
 
     var body: some View {
@@ -61,6 +62,10 @@ struct SettingsView: View {
                     if let account = reddit.account {
                         LabeledContent("Connecté en tant que", value: account.username)
                     }
+                    Button("Synchroniser mes sauvegardes Reddit") {
+                        Task { await syncModel.refreshSavedIDs(force: true) }
+                    }
+                    .disabled(!reddit.hasSession || syncModel.refreshingSaved)
                     Button(reddit.hasSession ? "Ouvrir Reddit" : "Se connecter à Reddit") {
                         loginPresented = true
                     }

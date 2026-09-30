@@ -125,6 +125,7 @@ struct FeedView: View {
                             .padding(.horizontal, 14).padding(.vertical, 8)
                             .background(.ultraThinMaterial, in: Capsule())
                     }
+                    .accessibilityLabel("Actualiser le flux et synchroniser les sauvegardes")
                     if model.loading {
                         ProgressView().tint(.white)
                             .padding(.horizontal, 14).padding(.vertical, 8)

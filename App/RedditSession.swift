@@ -61,6 +61,25 @@ final class RedditSession {
         }
     }
 
+    /// The account's whole saved list in one request. The caller is responsible for
+    /// rate limiting; see `FeedModel.refreshSavedIDs`.
+    func savedIDs() async throws -> Set<String> {
+        guard hasSession else { throw RedditAccountError.anonymous }
+        if account == nil { await loadAccount() }
+        guard let account, let url = RedditSaved.feedURL(username: account.username) else {
+            throw RedditAccountError.anonymous
+        }
+        var request = URLRequest(url: url)
+        if let cookie = await cookieHeader(for: url) {
+            request.setValue(cookie, forHTTPHeaderField: "Cookie")
+        }
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
+            throw RedditAccountError.refused((response as? HTTPURLResponse)?.statusCode ?? 0)
+        }
+        return RedditSaved.ids(from: try FeedParser.parse(data))
+    }
+
     /// Saves or unsaves a post on the signed-in Reddit account.
     func setSaved(fullname: String, saved: Bool) async throws {
         guard hasSession else { throw RedditAccountError.anonymous }
