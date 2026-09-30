@@ -189,8 +189,8 @@ private struct KDriveThumbnail: View {
                       kCGImageSourceCreateThumbnailWithTransform: true,
                       kCGImageSourceThumbnailMaxPixelSize: max(64, maxPixels)
                   ] as CFDictionary),
-                  let loaded = UIImage(cgImage: cg), !Task.isCancelled else { return }
-            self.image = loaded
+                  !Task.isCancelled else { return }
+            self.image = UIImage(cgImage: cg)
         }
     }
 }
