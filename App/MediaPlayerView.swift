@@ -97,30 +97,36 @@ struct MediaPlayerView: View {
             return AVPlayer(url: url)
         }
         guard item.url != nil else { throw CocoaError(.fileNoSuchFile) }
-        let cached = FileManager.default.temporaryDirectory.appending(path: "\(item.id).media")
-        try await fetchData().write(to: cached, options: .atomic)
-        return AVPlayer(url: cached)
+        return AVPlayer(url: try await resolvedURL())
     }
 
-    private func fetchData() async throws -> Data {
-        if let loader = item.loader { return try await loader() }
+    /// Streaming source. AVPlayer follows the redirect chain itself and ranges the
+    /// file, so nothing is buffered in full and no bytes pass through the app.
+    private func resolvedURL() async throws -> URL {
+        if let streamURL = item.streamURL { return try await streamURL() }
         guard let remote = item.url else { throw CocoaError(.fileNoSuchFile) }
-        var request = URLRequest(url: remote)
-        for (field, value) in item.headers { request.setValue(value, forHTTPHeaderField: field) }
-        let (data, response) = try await URLSession.shared.data(for: request)
-        guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
-            throw CocoaError(.fileReadCorruptFile)
-        }
-        return data
+        return remote
     }
 
     private func loadImage() async {
-        guard item.url != nil || item.loader != nil else { failed = true; return }
-        guard let data = try? await fetchData(), let image = UIImage(data: data), !Task.isCancelled else {
+        guard item.url != nil || item.streamURL != nil else { failed = true; return }
+        guard let image = try? await Self.image(from: try await resolvedURL(), headers: item.headers),
+              !Task.isCancelled else {
             failed = true
             return
         }
         self.image = image
+    }
+
+    private static func image(from url: URL, headers: [String: String]) async throws -> UIImage {
+        var request = URLRequest(url: url)
+        for (field, value) in headers { request.setValue(value, forHTTPHeaderField: field) }
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode),
+              let image = UIImage(data: data) else {
+            throw CocoaError(.fileReadCorruptFile)
+        }
+        return image
     }
 
     private func position(_ player: AVPlayer?) -> Double {

@@ -120,8 +120,9 @@ struct KDriveBrowserView: View {
             id: "kdrive-\(item.id)", title: item.name, subtitle: "kDrive",
             kind: mediaKind, resource: nil,
             url: KDriveClient.downloadURL(config: model.config, fileID: item.id),
-            headers: ["Authorization": "Bearer \(model.config.token)"],
-            loader: { try await model.download(item) })
+            // Resolved to a signed URL first, then streamed by the player. AVPlayer
+            // handles the redirect chain itself, so no bytes pass through the app.
+            streamURL: { try await self.model.streamURL(for: item) })
     }
 }
 

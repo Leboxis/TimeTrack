@@ -13,18 +13,19 @@ struct MediaItem: Identifiable {
     let resource: String?
     /// Direct media URL, for streamed content.
     let url: URL?
-    /// Extra request headers, e.g. the kDrive bearer token.
+    /// Extra request headers, e.g. a bearer token.
     var headers: [String: String] = [:]
-    /// Preferred fetch path, e.g. kDrive's direct-then-signed fallback. When nil the
-    /// item is fetched straight from `url` with `headers`.
-    var loader: (() async throws -> Data)?
+    /// Resolves `url` to something a player or image loader can stream. Used by kDrive:
+    /// the API call returns a signed, self-authorizing URL and the bytes never pass
+    /// through the app.
+    var streamURL: (() async throws -> URL)?
 
     init(id: String, title: String, subtitle: String, kind: MediaKind,
          resource: String?, url: URL?, headers: [String: String] = [:],
-         loader: (() async throws -> Data)? = nil) {
+         streamURL: (() async throws -> URL)? = nil) {
         self.id = id; self.title = title; self.subtitle = subtitle; self.kind = kind
         self.resource = resource; self.url = url; self.headers = headers
-        self.loader = loader
+        self.streamURL = streamURL
     }
 }
 

@@ -76,21 +76,42 @@ final class KDriveModel {
         }
     }
 
-    /// Fetches a remote file into the temporary directory. The download route answers
-    /// with bytes, possibly after a 302 to a signed URL; if that fails, the documented
-    /// `temporary_url` route is tried.
-    func download(_ item: KDriveItem) async throws -> Data {
-        if let data = try? await fetch(KDriveClient.downloadURL(config: config, fileID: item.id)) {
-            return data
+    /// A signed, self-authorizing URL for one file. Nothing is downloaded: the player
+    /// and the image loader stream straight from kDrive. kDrive redirects the direct
+    /// download route to exactly such a URL, so the direct route is tried first and
+    /// the documented `temporary_url` route is the fallback.
+    func streamURL(for item: KDriveItem) async throws -> URL {
+        if let resolved = try? await signedURL(from: KDriveClient.downloadURL(config: config, fileID: item.id)) {
+            return resolved
         }
-        let raw = try await fetch(KDriveClient.temporaryURL(config: config, fileID: item.id, duration: 600))
-        struct Wrapper: Decodable { let data: Payload? }
-        struct Payload: Decodable { let temporary_url: String? }
-        guard let url = try JSONDecoder().decode(Wrapper.self, from: raw).data?.temporary_url,
-              let signed = URL(string: url) else {
-            throw KDriveError.serverError(0, "Aucune URL de téléchargement obtenue")
+        return try await signedURL(from: KDriveClient.temporaryURL(config: config, fileID: item.id, duration: 3600))
+    }
+
+    /// The download route may answer 200 with bytes. In that case it is not a URL and
+    /// the caller must use `temporary_url` instead.
+    private func signedURL(from url: URL) async throws -> URL {
+        let (data, response) = try await raw(url)
+        let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+        if (200...299).contains(status) {
+            struct Wrapper: Decodable { let data: Payload? }
+            struct Payload: Decodable { let temporary_url: String? }
+            if let signed = try? JSONDecoder().decode(Wrapper.self, from: data).data?.temporary_url,
+               let parsed = URL(string: signed) {
+                return parsed
+            }
+            throw KDriveError.serverError(status, "Réponse binaire : URL signée indisponible")
         }
-        return try await fetch(signed, authorized: false)
+        guard let http = response as? HTTPURLResponse else { throw KDriveError.invalidURL }
+        throw KDriveError.serverError(http.statusCode, "HTTP \(http.statusCode)")
+    }
+
+    private func raw(_ url: URL) async throws -> (Data, URLResponse) {
+        var request = URLRequest(url: url)
+        request.setValue("Bearer \(config.token)", forHTTPHeaderField: "Authorization")
+        let (data, response) = try await session.data(for: request)
+        guard let http = response as? HTTPURLResponse else { throw KDriveError.invalidURL }
+        if http.statusCode == 401 { throw KDriveError.authenticationFailed }
+        return (data, response)
     }
 
     private func fetch(_ url: URL, authorized: Bool = true) async throws -> Data {
