@@ -9,7 +9,7 @@ final class RedditSavedTests: XCTestCase {
     }
 
     func testSavedFeedURLCarriesTheAfterCursor() throws {
-        let url = try XCTUnwrap(RedditSaved.feedURL(username: "u", limit: 100, after: "t3_abc"))
+        let url = try XCTUnwrap(RedditSaved.feedURL(username: "user", limit: 100, after: "t3_abc"))
         XCTAssertEqual(url.query, "limit=100&after=t3_abc")
     }
 
@@ -28,6 +28,8 @@ final class RedditSavedTests: XCTestCase {
     func testRejectsAUsernameWithUrlUnsafeCharacters() {
         XCTAssertNil(RedditSaved.feedURL(username: "a/b"))
         XCTAssertNil(RedditSaved.feedURL(username: ""))
+        XCTAssertNil(RedditSaved.feedURL(username: "ab"))          // under 3 characters
+        XCTAssertNil(RedditSaved.feedURL(username: "a/b c"))        // slash and space
     }
 
     func testMergeKeepsLocalSavesAndAddsRemotes() {
