@@ -67,6 +67,7 @@ struct JournalView: View {
                                 .fill(RatingPalette.rampTint(session.feeling))
                                 .frame(width: 4)
                         }
+                        .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
                     }
                     .swipeActions {
                         Button("Supprimer", role: .destructive) { deleting = session }

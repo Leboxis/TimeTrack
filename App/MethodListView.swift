@@ -3,33 +3,30 @@ import SwiftUI
 struct MethodListView: View {
     private let methods = MethodCatalog.all
     @State private var showsFeed = false
+    /// Driven explicitly rather than by `NavigationLink`. Three links sharing one
+    /// `List` row is what produced the reported bug: SwiftUI treats the row as a
+    /// single navigation target, so tapping Galeries could land on Medias, and it drew
+    /// a disclosure chevron for each link it found. One path and plain buttons remove
+    /// both at the source, since there is no link left for the row to disagree with.
+    @State private var path: [MethodRoute] = []
 
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $path) {
             List {
-                // Three destinations of equal weight, so they sit side by side rather
-                // than as three stacked rows: one row, three tiles.
                 Section {
                     HStack(spacing: 10) {
                         Button { showsFeed = true } label: {
                             tile("Flux", "play.rectangle")
                         }
-                        .buttonStyle(.plain)
-
-                        NavigationLink { MediaLibraryView() } label: {
+                        Button { path.append(.medias) } label: {
                             tile("Médias", "play.circle")
                         }
-                        .buttonStyle(.plain)
-
-                        NavigationLink { GalleryPickerView() } label: {
+                        Button { path.append(.galeries) } label: {
                             tile("Galeries", "photo.on.rectangle")
                         }
-                        .buttonStyle(.plain)
                     }
                     .padding(.vertical, 8)
                     .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
-                    // A row holding several NavigationLinks otherwise leaves stray
-                    // grey rounded rectangles behind each label.
                     .listRowBackground(Color.clear)
                     .listRowSeparator(.hidden)
                 }
@@ -53,6 +50,12 @@ struct MethodListView: View {
                 }
             }
             .navigationTitle("Méthode")
+            .navigationDestination(for: MethodRoute.self) { route in
+                switch route {
+                case .medias: MediaLibraryView()
+                case .galeries: GalleryPickerView()
+                }
+            }
         }
         .fullScreenCover(isPresented: $showsFeed) { FeedView() }
     }
@@ -67,11 +70,14 @@ struct MethodListView: View {
                 .foregroundStyle(.primary)
                 .lineLimit(1)
         }
-        // Equal width from the HStack, and a fixed height so the three read as one row
-        // even if a title wraps differently.
         .frame(maxWidth: .infinity)
         .frame(height: 64)
         .background(RatingPalette.duration.opacity(0.10), in: RoundedRectangle(cornerRadius: 14))
         .contentShape(Rectangle())
     }
+}
+
+/// What the three tiles can open. Hashable so it can ride the navigation path.
+private enum MethodRoute: Hashable {
+    case medias, galeries
 }

@@ -49,10 +49,6 @@ struct TimerView: View {
                     .buttonStyle(.borderedProminent).controlSize(.large)
                     .disabled((!isRunning && timer.draft.accumulated == 0) || store.loadFailed)
 
-                    Text("Un moment pour vous. Observez votre ressenti, à votre rythme.")
-                        .font(.subheadline).foregroundStyle(.secondary)
-                        .multilineTextAlignment(.center)
-
                     HStack {
                         Button("Réinitialiser", role: .destructive) { confirmReset = true }
                         Spacer()
@@ -60,8 +56,6 @@ struct TimerView: View {
                             .disabled(store.loadFailed)
                     }.font(.subheadline)
 
-                    Label("Journal personnel • données sur cet appareil", systemImage: "lock.shield")
-                        .font(.footnote).foregroundStyle(.secondary)
                     if store.loadFailed {
                         Text("Le journal n’a pas pu être lu en entier. Ouvrez Réglages pour exporter les séances récupérées ou réinitialiser le fichier local.")
                             .font(.footnote).foregroundStyle(.red)

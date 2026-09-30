@@ -30,8 +30,6 @@ struct SettingsView: View {
         NavigationStack {
             Form {
                 Section {
-                    Label("Wellbeing", systemImage: "leaf.fill").font(.title2).foregroundStyle(.teal)
-                    Text("Votre journal personnel, simplement.").foregroundStyle(.secondary)
                     LabeledContent("Version", value: Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "—")
                 }
                 if store.loadFailed {
@@ -50,10 +48,6 @@ struct SettingsView: View {
                         exporting = true
                     } label: { Label("Exporter en CSV", systemImage: "square.and.arrow.up") }
                     .disabled(store.sessions.isEmpty)
-                    Text("L’export contient vos notes personnelles. Choisissez un emplacement qui vous convient.")
-                        .font(.footnote).foregroundStyle(.secondary)
-                    Text("Les séances enregistrées avant la version 1.4.0 affichent 3/5 pour le ressenti de l’orgasme et le ressenti mental, et « Aucune » pour le type d’éjaculation. Ouvrez-les pour les corriger.")
-                        .font(.footnote).foregroundStyle(.secondary)
                 }
                 Section {
                     Label(reddit.hasSession ? "Session Reddit détectée" : "Reddit · sans session",
@@ -107,11 +101,6 @@ struct SettingsView: View {
                     Text("kDrive")
                 } footer: {
                         Text("Jeton API Infomaniak et ID du Drive. Le jeton est stocké en clair dans les réglages de l’app : quiconque y ayant accès peut lire ton Drive. Retire-le si l’app est partagée.")
-                }
-                Section("Confidentialité") {
-                    Label("Journal local, sans compte ni suivi", systemImage: "person.crop.circle.badge.checkmark")
-                    Text("Le journal reste dans son espace local et peut être inclus dans les sauvegardes de votre appareil. Exportez-le avant de désinstaller l’app ou son conteneur. Seul le flux RSS contacte Reddit, avec ta session si elle est connectée.")
-                        .font(.footnote).foregroundStyle(.secondary)
                 }
                 Section {
                     if store.loadFailed {
