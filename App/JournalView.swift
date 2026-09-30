@@ -45,9 +45,15 @@ struct JournalView: View {
                             }
                             HStack {
                                 Text(session.date, format: .dateTime.hour().minute())
+                                    .foregroundStyle(.secondary)
                                 Spacer()
-                                Label("\(session.feeling)/5", systemImage: "heart")
-                            }.font(.caption).foregroundStyle(.secondary)
+                                // Same band as the stripe and the "Ressenti" chip, so the
+                                // three read as one signal rather than three.
+                                Label("\(session.feeling)/5", systemImage: "heart.fill")
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundStyle(RatingPalette.ramp(session.feeling))
+                            }
+                            .font(.caption)
                             HStack(spacing: 6) {
                                 // Same band as the stripe, so the row's colour and the
                                 // rating it reports can never disagree.
@@ -69,6 +75,10 @@ struct JournalView: View {
                         }
                         .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
                     }
+                    // Without this the row's label inherits the accent colour, which is
+                    // what painted the whole journal blue and overrode every deliberate
+                    // foreground inside it.
+                    .buttonStyle(.plain)
                     .swipeActions {
                         Button("Supprimer", role: .destructive) { deleting = session }
                     }
@@ -106,14 +116,21 @@ struct JournalView: View {
         }
     }
 
-    /// Soft tint behind the label, text left at the default colour so the rating stays
-    /// readable rather than fighting a saturated foreground.
+    /// Soft tint behind the label, semibold text, and a ring in the same hue.
+    ///
+    /// The ring is what makes these readable at a glance without inverting text against
+    /// the fill: a saturated background with white text is the loud option, and it fails
+    /// on the amber band of the ramp, where white does not reach the contrast ratio.
+    /// A ring adds the presence and never inverts anything.
     private func chip(_ text: String, _ color: Color) -> some View {
         Text(text)
-            .font(.caption2.weight(.medium))
+            .font(.caption2.weight(.semibold))
             .foregroundStyle(.primary)
-            .padding(.horizontal, 7).padding(.vertical, 3)
-            .background(color.opacity(0.12), in: Capsule())
+            .padding(.horizontal, 8).padding(.vertical, 4)
+            .background(color.opacity(0.14), in: Capsule())
+            .overlay {
+                Capsule().strokeBorder(color.opacity(0.55), lineWidth: 1.5)
+            }
     }
 
     private func accessibilitySummary(_ session: Session) -> String {
