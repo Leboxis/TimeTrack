@@ -1,15 +1,59 @@
 import AVFoundation
 import SwiftUI
+import UIKit
 
 /// Plays one bundled or streamed media file. Audio has no system control centre
 /// integration and no background mode: the app is unsigned and foreground-only.
 struct MediaPlayerView: View {
     let item: MediaItem
     @State private var player: AVPlayer?
+    @State private var image: UIImage?
     @State private var playing = false
     @State private var failed = false
 
     var body: some View {
+        Group {
+            if item.kind == .image {
+                imageBody
+            } else {
+                playerBody
+            }
+        }
+        .frame(maxWidth: 600).frame(maxWidth: .infinity)
+        .padding()
+        .navigationTitle("Lecture")
+        .navigationBarTitleDisplayMode(.inline)
+        .privacyMask()
+        .task {
+            if item.kind == .image {
+                await loadImage()
+            } else {
+                guard player == nil, !failed else { return }
+                do {
+                    player = try await makePlayer()
+                    player?.play()
+                    playing = true
+                } catch { failed = true }
+            }
+        }
+        .onDisappear { player?.pause() }
+    }
+
+    private var imageBody: some View {
+        ZStack {
+            Color.black
+            if let image {
+                Image(uiImage: image).resizable().scaledToFit()
+            } else if failed {
+                ContentUnavailableView("Image indisponible", systemImage: "photo")
+                    .foregroundStyle(.white)
+            } else {
+                ProgressView().tint(.white)
+            }
+        }
+    }
+
+    private var playerBody: some View {
         VStack(spacing: 24) {
             if let player {
                 VStack(spacing: 8) {
@@ -45,22 +89,6 @@ struct MediaPlayerView: View {
                                         systemImage: failed ? "exclamationmark.triangle" : "waveform")
             }
         }
-        .frame(maxWidth: 600).frame(maxWidth: .infinity)
-        .padding()
-        .navigationTitle("Lecture")
-        .navigationBarTitleDisplayMode(.inline)
-        .privacyMask()
-        .task {
-            guard player == nil, !failed else { return }
-            do {
-                player = try await makePlayer()
-                player?.play()
-                playing = true
-            } catch { failed = true }
-        }
-        .onDisappear {
-            player?.pause()
-        }
     }
 
     private func makePlayer() async throws -> AVPlayer {
@@ -69,13 +97,28 @@ struct MediaPlayerView: View {
             return AVPlayer(url: url)
         }
         guard let remote = item.url else { throw CocoaError(.fileNoSuchFile) }
-        let (data, response) = try await URLSession.shared.data(from: remote)
+        let cached = FileManager.default.temporaryDirectory.appending(path: "\(item.id).media")
+        var request = URLRequest(url: remote)
+        for (field, value) in item.headers { request.setValue(value, forHTTPHeaderField: field) }
+        let (data, response) = try await URLSession.shared.data(for: request)
         guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
             throw CocoaError(.fileReadCorruptFile)
         }
-        let cached = FileManager.default.temporaryDirectory.appending(path: "\(item.id).media")
         try data.write(to: cached, options: .atomic)
         return AVPlayer(url: cached)
+    }
+
+    private func loadImage() async {
+        guard let remote = item.url else { failed = true; return }
+        var request = URLRequest(url: remote)
+        for (field, value) in item.headers { request.setValue(value, forHTTPHeaderField: field) }
+        guard let (data, response) = try? await URLSession.shared.data(for: request),
+              let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode),
+              let image = UIImage(data: data), !Task.isCancelled else {
+            failed = true
+            return
+        }
+        self.image = image
     }
 
     private func position(_ player: AVPlayer?) -> Double {

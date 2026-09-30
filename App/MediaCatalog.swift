@@ -1,7 +1,7 @@
 import Foundation
 
 enum MediaKind: String {
-    case audio, video
+    case audio, video, image
 }
 
 struct MediaItem: Identifiable {
@@ -13,6 +13,14 @@ struct MediaItem: Identifiable {
     let resource: String?
     /// Direct media URL, for streamed content.
     let url: URL?
+    /// Extra request headers, e.g. the kDrive bearer token.
+    var headers: [String: String] = [:]
+
+    init(id: String, title: String, subtitle: String, kind: MediaKind,
+         resource: String?, url: URL?, headers: [String: String] = [:]) {
+        self.id = id; self.title = title; self.subtitle = subtitle; self.kind = kind
+        self.resource = resource; self.url = url; self.headers = headers
+    }
 }
 
 struct MediaCategory: Identifiable {

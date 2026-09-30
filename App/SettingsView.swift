@@ -71,6 +71,13 @@ struct SettingsView: View {
                 } footer: {
                     Text("Session conservée dans le magasin de cookies du système, jamais dans les données de l’app. Elle donne accès à ton compte entier, pas seulement à la lecture. « Se déconnecter » l’efface.")
                 }
+                Section {
+                    KDriveSettings()
+                } header: {
+                    Text("kDrive")
+                } footer: {
+                    Text("Jeton API Infomaniak et ID du Drive. Le jeton est stocké en clair dans les réglages de l’app :anyone y ayant accès peut lire ton Drive. Retire-le si l’app est partagée.")
+                }
                 Section("Confidentialité") {
                     Label("Journal local, sans compte ni suivi", systemImage: "person.crop.circle.badge.checkmark")
                     Text("Le journal reste dans son espace local et peut être inclus dans les sauvegardes de votre appareil. Exportez-le avant de désinstaller l’app ou son conteneur. Seul le flux RSS contacte Reddit, avec ta session si elle est connectée.")
