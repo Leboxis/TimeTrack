@@ -47,4 +47,56 @@ final class RedditSavedTests: XCTestCase {
         XCTAssertTrue(RedditSaved.isStale(now.addingTimeInterval(-7_200), now: now))
         XCTAssertFalse(RedditSaved.isStale(now.addingTimeInterval(-60), now: now))
     }
+
+    func testWalksEveryPageUntilItRunsOut() async throws {
+        // Three full pages, then a short one that ends the walk.
+        let pages: [[String]] = [
+            (0..<100).map { "t3_p1_\($0)" },
+            (0..<100).map { "t3_p2_\($0)" },
+            (0..<100).map { "t3_p3_\($0)" },
+            ["t3_last"]
+        ]
+        var calls = 0
+        let ids = try await RedditSaved.walkAllIDs(maxPages: 10) { after in
+            let index = calls
+            calls += 1
+            return pages[index].map {
+                Post(id: $0, title: $0, html: "")
+            }
+        }
+        XCTAssertEqual(ids.count, 301)
+        XCTAssertTrue(ids.contains("t3_p3_99"))
+        XCTAssertTrue(ids.contains("t3_last"))
+        XCTAssertEqual(calls, 4)
+    }
+
+    func testStopsOnARepeatedCursor() async throws {
+        // A server that keeps handing back the same cursor must not loop forever.
+        var calls = 0
+        let ids = try await RedditSaved.walkAllIDs(maxPages: 10) { _ in
+            calls += 1
+            return [Post(id: "t3_same", title: "a", html: "")]
+        }
+        XCTAssertEqual(ids, ["t3_same"])
+        XCTAssertEqual(calls, 1)
+    }
+
+    func testStopsAtThePageCap() async throws {
+        var calls = 0
+        _ = try await RedditSaved.walkAllIDs(maxPages: 3) { after in
+            calls += 1
+            return [Post(id: "t3_\(after ?? "0")", title: "a", html: "")]
+        }
+        XCTAssertEqual(calls, 3)
+    }
+
+    func testAnEmptyFirstPageEndsTheWalk() async throws {
+        var calls = 0
+        let ids = try await RedditSaved.walkAllIDs(maxPages: 5) { _ in
+            calls += 1
+            return []
+        }
+        XCTAssertTrue(ids.isEmpty)
+        XCTAssertEqual(calls, 1)
+    }
 }
