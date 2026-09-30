@@ -19,7 +19,7 @@ struct KDriveBrowserView: View {
 
     private let spacing: CGFloat = 10
     private let padding: CGFloat = 12
-    private let minimumTile: CGFloat = 118
+    private let minimumTile: CGFloat = 104
     private let labelHeight: CGFloat = 30
 
     private var current: KDrivePathNode { path[path.count - 1] }
@@ -48,7 +48,10 @@ struct KDriveBrowserView: View {
         .toolbar {
             ToolbarItem(placement: .principal) { breadcrumb }
         }
-        .task(id: current.id) { await model.load(directoryID: current.id) }
+        .task(id: current.id) {
+            await model.load(directoryID: current.id)
+            model.prewarm(model.items)
+        }
         .sheet(item: $playing) { MediaPlayerView(item: $0) }
         .fullScreenCover(item: $watching) { VideoPlayerScreen(item: $0) }
         .privacyMask()
@@ -56,8 +59,11 @@ struct KDriveBrowserView: View {
 
     private var grid: some View {
         GeometryReader { proxy in
-            let count = max(2, Int((proxy.size.width - 2 * padding + spacing) / (minimumTile + spacing)))
-            let tile = (proxy.size.width - 2 * padding - spacing * CGFloat(count - 1)) / CGFloat(count)
+            let available = proxy.size.width - 2 * padding
+            // Never more than three across: wider tiles stay tappable and the name band
+            // has room for a real file name.
+            let count = min(3, max(1, Int((available + spacing) / (minimumTile + spacing))))
+            let tile = (available - spacing * CGFloat(count - 1)) / CGFloat(count)
             ScrollView {
                 LazyVGrid(columns: Array(repeating: GridItem(.fixed(tile), spacing: spacing), count: count),
                           spacing: spacing) {

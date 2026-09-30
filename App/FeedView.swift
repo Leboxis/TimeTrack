@@ -34,9 +34,12 @@ struct FeedView: View {
                         description: Text(message))
                     Button("Réessayer") { model.load() }.buttonStyle(.borderedProminent).tint(.white)
                 }
+            } else if model.posts.isEmpty {
+                ContentUnavailableView("Aucun post", systemImage: "text.bubble",
+                    description: Text("r/\(model.subreddit) ne renvoie aucun post. Le subreddit peut être vide, privé, ou ton compteReddit n’y a pas accès."))
             } else if entries.isEmpty {
                 ContentUnavailableView("Aucun média", systemImage: "photo",
-                    description: Text("Les posts de ce flux ne contiennent pas de média lisible."))
+                    description: Text("\(model.posts.count) post(s) reçu(s) sur r/\(model.subreddit), mais aucun ne contient de média lisible."))
             } else {
                 ScrollView(.vertical) {
                     LazyVStack(spacing: 0) {
@@ -44,6 +47,13 @@ struct FeedView: View {
                             FeedCard(entry: entry, isActive: entry.id == visibleID, model: model)
                                 .containerRelativeFrame(.vertical)
                                 .id(entry.id)
+                                .onAppear {
+                                    if entry.id == entries.last?.id { model.loadMore() }
+                                }
+                        }
+                        if model.loadingMore {
+                            ProgressView().tint(.white)
+                                .containerRelativeFrame(.vertical)
                         }
                     }
                     .scrollTargetLayout()

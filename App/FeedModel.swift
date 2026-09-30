@@ -17,6 +17,8 @@ final class FeedModel {
     }
     private(set) var posts: [Post] = []
     private(set) var loading = false
+    private(set) var loadingMore = false
+    private(set) var hasMore = true
     var errorMessage: String?
 
     private var redgifsToken: String?
@@ -59,6 +61,7 @@ final class FeedModel {
             let parsed = try FeedParser.parse(data)
             guard loadGeneration == mine else { return }
             posts = parsed
+            hasMore = parsed.count >= 25
         } catch is CancellationError {
             // Superseded by a newer load; leave the previous posts in place.
         } catch let urlError as URLError where urlError.code == .cancelled {
@@ -71,6 +74,30 @@ final class FeedModel {
             guard loadGeneration == mine else { return }
             posts = []
             errorMessage = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+        }
+    }
+
+    /// Appends the next page, walking Reddit's `after` cursor from the last post seen.
+    func loadMore() {
+        guard !loadingMore, !loading, hasMore, let last = posts.last else { return }
+        loadingMore = true
+        Task {
+            defer { loadingMore = false }
+            do {
+                let name = try subredditName(subreddit)
+                let (data, response) = try await get(feedURL(subreddit: name, after: last.id))
+                guard let http = response as? HTTPURLResponse else { throw FeedError.invalidFeed }
+                if http.statusCode == 429 { hasMore = false; return }
+                guard (200...299).contains(http.statusCode) else { throw FeedError.http(http.statusCode) }
+                let parsed = try FeedParser.parse(data)
+                guard !parsed.isEmpty else { hasMore = false; return }
+                let known = Set(posts.map(\.id))
+                let fresh = parsed.filter { !known.contains($0.id) }
+                posts.append(contentsOf: fresh)
+                if parsed.count < 25 || fresh.isEmpty { hasMore = false }
+            } catch {
+                hasMore = false
+            }
         }
     }
 

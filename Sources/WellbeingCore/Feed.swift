@@ -45,9 +45,11 @@ public enum FeedError: LocalizedError {
 
 // MARK: - Feed URL and subreddit validation
 
-public func feedURL(subreddit name: String) -> URL {
+public func feedURL(subreddit name: String, after: String? = nil) -> URL {
     var components = URLComponents(string: "https://www.reddit.com/r/\(name)/new.rss")!
-    components.queryItems = [URLQueryItem(name: "limit", value: "25")]
+    var items = [URLQueryItem(name: "limit", value: "25")]
+    if let after, !after.isEmpty { items.append(URLQueryItem(name: "after", value: after)) }
+    components.queryItems = items
     return components.url!
 }
 
