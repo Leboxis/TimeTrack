@@ -12,42 +12,52 @@ struct MethodListView: View {
 
     var body: some View {
         NavigationStack(path: $path) {
-            List {
-                Section {
-                    HStack(spacing: 10) {
-                        Button { showsFeed = true } label: {
-                            tile("Flux", "play.rectangle")
-                        }
-                        Button { path.append(.medias) } label: {
-                            tile("Médias", "play.circle")
-                        }
-                        Button { path.append(.galeries) } label: {
-                            tile("Galeries", "photo.on.rectangle")
+            // The tiles live outside the List. Inside a row, SwiftUI stretches every
+            // Button to the full width of that row, so the three of them sat on top of
+            // each other and a single tap fired all three. Nothing in a List gets to
+            // manage the tap target here.
+            VStack(spacing: 0) {
+                HStack(spacing: 10) {
+                    Button { showsFeed = true } label: {
+                        tile("Flux", "play.rectangle")
+                    }
+                    .buttonStyle(.plain)
+
+                    Button { path.append(.medias) } label: {
+                        tile("Médias", "play.circle")
+                    }
+                    .buttonStyle(.plain)
+
+                    Button { path.append(.galeries) } label: {
+                        tile("Galeries", "photo.on.rectangle")
+                    }
+                    .buttonStyle(.plain)
+                }
+                .padding(.horizontal, 16)
+                .padding(.top, 8)
+                .padding(.bottom, 12)
+
+                List {
+                    if methods.isEmpty {
+                        ContentUnavailableView("Aucune méthode", systemImage: "text.book.closed",
+                            description: Text("Les méthodes ajoutées apparaîtront ici."))
+                    }
+                    ForEach(methods) { method in
+                        NavigationLink {
+                            MethodDetailView(method: method)
+                        } label: {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(method.title).font(.headline).foregroundStyle(.primary)
+                                Text(method.summary).font(.subheadline).foregroundStyle(.secondary).lineLimit(2)
+                                if let cadence = method.cadence {
+                                    Label(cadence, systemImage: "calendar")
+                                        .font(.caption).foregroundStyle(.secondary)
+                                }
+                            }.padding(.vertical, 4)
                         }
                     }
-                    .padding(.vertical, 8)
-                    .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
-                    .listRowBackground(Color.clear)
-                    .listRowSeparator(.hidden)
                 }
-                if methods.isEmpty {
-                    ContentUnavailableView("Aucune méthode", systemImage: "text.book.closed",
-                        description: Text("Les méthodes ajoutées apparaîtront ici."))
-                }
-                ForEach(methods) { method in
-                    NavigationLink {
-                        MethodDetailView(method: method)
-                    } label: {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(method.title).font(.headline).foregroundStyle(.primary)
-                            Text(method.summary).font(.subheadline).foregroundStyle(.secondary).lineLimit(2)
-                            if let cadence = method.cadence {
-                                Label(cadence, systemImage: "calendar")
-                                    .font(.caption).foregroundStyle(.secondary)
-                            }
-                        }.padding(.vertical, 4)
-                    }
-                }
+                .listStyle(.insetGrouped)
             }
             .navigationTitle("Méthode")
             .navigationDestination(for: MethodRoute.self) { route in
@@ -73,6 +83,8 @@ struct MethodListView: View {
         .frame(maxWidth: .infinity)
         .frame(height: 64)
         .background(RatingPalette.duration.opacity(0.10), in: RoundedRectangle(cornerRadius: 14))
+        // Without this the tappable area is the label's own text and glyph, not the
+        // tile the user aims at.
         .contentShape(Rectangle())
     }
 }
