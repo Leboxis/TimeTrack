@@ -47,29 +47,18 @@ final class FeedModel {
         loading = true
         errorMessage = nil
         defer { if loadGeneration == mine { loading = false } }
-        if FeedDiagnostics.shared.rateLimited() {
-            errorMessage = "Reddit limite les requêtes. Patiente quelques secondes puis réessaie."
-            FeedDiagnostics.shared.record("requête ignorée : encore limited par Reddit")
-            return
-        }
         do {
             let name = try subredditName(subreddit)
             await RedditSession.shared.refresh()
-            FeedDiagnostics.shared.record("GET r/\(name) — session Reddit : \(RedditSession.shared.hasSession ? "oui" : "non")")
             let (data, response) = try await get(feedURL(subreddit: name))
             try Task.checkCancellation()
             guard loadGeneration == mine else { return }
             guard let http = response as? HTTPURLResponse else { throw FeedError.invalidFeed }
-            if http.statusCode == 429 {
-                FeedDiagnostics.shared.cooldown(from: http.allHeaderFields)
-                FeedDiagnostics.shared.record("HTTP 429 — quota épuisé, reset dans \(http.value(forHTTPHeaderField: "x-ratelimit-reset") ?? "?") s")
-                throw FeedError.rateLimited
-            }
+            if http.statusCode == 429 { throw FeedError.rateLimited }
             guard (200...299).contains(http.statusCode) else { throw FeedError.http(http.statusCode) }
             let parsed = try FeedParser.parse(data)
             guard loadGeneration == mine else { return }
             posts = parsed
-            FeedDiagnostics.shared.record("OK — \(parsed.count) entrées")
         } catch is CancellationError {
             // Superseded by a newer load; leave the previous posts in place.
         } catch let urlError as URLError where urlError.code == .cancelled {
@@ -78,12 +67,10 @@ final class FeedModel {
             guard loadGeneration == mine else { return }
             posts = []
             errorMessage = offlineMessage(for: urlError)
-            FeedDiagnostics.shared.record("échec réseau : \(urlError.code.rawValue) \(urlError.localizedDescription)")
         } catch {
             guard loadGeneration == mine else { return }
             posts = []
             errorMessage = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
-            if case FeedError.http(let code) = error { FeedDiagnostics.shared.record("échec HTTP \(code)") }
         }
     }
 
@@ -106,26 +93,12 @@ final class FeedModel {
             // Reddit gates NSFW subreddit feeds on the `over18` consent cookie, which
             // the login WebView never sets on its own. The user's account is
             // adult-enabled; asserting it here mirrors what the web interstitial does.
-            let names = cookieNames(cookie ?? "")
-            if !names.contains("over18") {
+            if cookie?.contains("over18=") != true {
                 cookie = [cookie, "over18=1"].compactMap { $0 }.joined(separator: "; ")
             }
-            if let cookie {
-                request.setValue(cookie, forHTTPHeaderField: "Cookie")
-                FeedDiagnostics.shared.record("cookie attaché : \(cookieNames(cookie).joined(separator: ", "))")
-            } else {
-                FeedDiagnostics.shared.record("aucun cookie attaché")
-            }
+            if let cookie { request.setValue(cookie, forHTTPHeaderField: "Cookie") }
         }
         return try await session.data(for: request)
-    }
-
-    /// Names only, never values: a session cookie must never reach a log the user reads.
-    private func cookieNames(_ header: String) -> [String] {
-        header.split(separator: ";").compactMap { pair in
-            let name = pair.split(separator: "=").first.map(String.init)?.trimmingCharacters(in: .whitespaces)
-            return (name?.isEmpty == false) ? name : nil
-        }
     }
 
     /// URLSession copies headers onto the redirect request, so a 302 to a CDN would
@@ -165,15 +138,9 @@ final class FeedModel {
 
     private func checked(_ url: URL, headers: [String: String] = [:]) async throws -> Data {
         let (data, response) = try await get(url, headers: headers)
-            guard let http = response as? HTTPURLResponse else { throw FeedError.invalidFeed }
-            if http.statusCode == 401 || http.statusCode == 403 {
-                // The cookie we believed was valid was refused: the reference keeps
-                // showing "session detected" here, which is the reported symptom.
-                RedditSession.shared.markExpired()
-                throw FeedError.http(http.statusCode)
-            }
-            guard (200...299).contains(http.statusCode) else { throw FeedError.http(http.statusCode) }
-            return data
+        guard let http = response as? HTTPURLResponse else { throw FeedError.invalidFeed }
+        guard (200...299).contains(http.statusCode) else { throw FeedError.http(http.statusCode) }
+        return data
     }
 
     func loadImage(_ url: URL, maxPixels: Int) async throws -> UIImage {

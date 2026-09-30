@@ -22,15 +22,7 @@ struct SettingsView: View {
     @State private var confirmErase = false
     @State private var confirmReset = false
     @State private var reddit = RedditSession.shared
-    @State private var diagnostics = FeedDiagnostics.shared
     @State private var loginPresented = false
-
-    /// One throwaway request so the diagnostics panel shows something even when the
-    /// feed screen was never opened.
-    private func probeFeed() {
-        let model = FeedModel()
-        model.load()
-    }
 
     var body: some View {
         NavigationStack {
@@ -62,27 +54,10 @@ struct SettingsView: View {
                         .font(.footnote).foregroundStyle(.secondary)
                 }
                 Section {
-                    Label(reddit.hasSession ? "Session Reddit détectée" :
-                          reddit.expired ? "Session expirée" : "Reddit · sans session",
+                    Label(reddit.hasSession ? "Session Reddit détectée" : "Reddit · sans session",
                           systemImage: reddit.hasSession ? "checkmark.shield.fill" : "person.crop.circle.badge.questionmark")
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(reddit.hasSession ? Color.green : Color.secondary)
-                    ForEach(reddit.cookieReport) { verdict in
-                        HStack(spacing: 8) {
-                            Text(verdict.name).font(.caption2.monospaced())
-                            Spacer()
-                            if verdict.expired {
-                                Text("expiré").font(.caption2).foregroundStyle(.orange)
-                            } else if verdict.attachable {
-                                Image(systemName: "checkmark.circle.fill")
-                                    .font(.caption2).foregroundStyle(.green)
-                            } else {
-                                Image(systemName: "xmark.circle")
-                                    .font(.caption2).foregroundStyle(.secondary)
-                            }
-                        }
-                        .textSelection(.enabled)
-                    }
                     Button(reddit.hasSession ? "Ouvrir Reddit" : "Se connecter à Reddit") {
                         loginPresented = true
                     }
@@ -94,22 +69,7 @@ struct SettingsView: View {
                 } header: {
                     Text("Reddit")
                 } footer: {
-                    Text("Session conservée dans le magasin de cookies du système, jamais dans les données de l’app. Elle donne accès à ton compte entier, pas seulement à la lecture. Les cookies hors domaine Reddit sont ignorés. « Se déconnecter » l’efface.")
-                }
-                Section {
-                    ForEach(Array(diagnostics.lines.enumerated()), id: \.offset) { _, line in
-                        Text(line)
-                            .font(.caption2.monospaced())
-                            .foregroundStyle(.secondary)
-                            .textSelection(.enabled)
-                    }
-                    Button("Tester le flux maintenant") { probeFeed() }
-                        .disabled(diagnostics.rateLimited())
-                    Button("Effacer le journal de diagnostic", role: .destructive) { diagnostics.reset() }
-                } header: {
-                    Text("Diagnostic du flux")
-                } footer: {
-                    Text("Journal des requêtes envoyées à Reddit : statut HTTP, présence du cookie de session et quota restant. Aucune valeur de cookie n’est écrite ici.")
+                    Text("Session conservée dans le magasin de cookies du système, jamais dans les données de l’app. Elle donne accès à ton compte entier, pas seulement à la lecture. « Se déconnecter » l’efface.")
                 }
                 Section("Confidentialité") {
                     Label("Journal local, sans compte ni suivi", systemImage: "person.crop.circle.badge.checkmark")

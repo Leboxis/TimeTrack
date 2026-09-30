@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct MethodListView: View {
+    @Binding var hidesTabBar: Bool
     private let methods = MethodCatalog.all
 
     var body: some View {
@@ -9,6 +10,8 @@ struct MethodListView: View {
                 Section {
                     NavigationLink {
                         FeedView()
+                            .onAppear { hidesTabBar = true }
+                            .onDisappear { hidesTabBar = false }
                     } label: {
                         Label("Flux", systemImage: "play.rectangle")
                     }
