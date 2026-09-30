@@ -2,6 +2,12 @@ import SwiftUI
 import UIKit
 import WellbeingCore
 
+/// One level of the kDrive path, for the breadcrumb.
+struct KDrivePathNode: Identifiable, Hashable {
+    let id: String
+    let name: String
+}
+
 /// Grid of kDrive items: folders plus media with their kDrive thumbnail.
 struct KDriveBrowserView: View {
     @State private var model = KDriveModel()
