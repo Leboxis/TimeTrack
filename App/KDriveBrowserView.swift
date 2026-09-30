@@ -144,7 +144,6 @@ struct KDriveBrowserView: View {
                     if index > 0 {
                         Image(systemName: "chevron.right").font(.caption2).foregroundStyle(.tertiary)
                     }
-                    .transition(.scale(scale: 0.8).combined(with: .opacity))
                     Button {
                         withAnimation(.snappy(duration: 0.28)) {
                             path = Array(path.prefix(index + 1))
@@ -152,6 +151,7 @@ struct KDriveBrowserView: View {
                     } label: {
                         Text(node.name).font(.caption).lineLimit(1)
                     }
+                    .transition(.scale(scale: 0.8).combined(with: .opacity))
                 }
             }
         }
