@@ -96,13 +96,6 @@ struct SettingsView: View {
                     Text("Session conservée dans le magasin de cookies du système, jamais dans les données de l’app. Elle donne accès à ton compte entier, pas seulement à la lecture. « Se déconnecter » l’efface.")
                 }
                 Section {
-                    KDriveSettings()
-                } header: {
-                    Text("kDrive")
-                } footer: {
-                        Text("Jeton API Infomaniak et ID du Drive. Le jeton est stocké en clair dans les réglages de l’app : quiconque y ayant accès peut lire ton Drive. Retire-le si l’app est partagée.")
-                }
-                Section {
                     if store.loadFailed {
                         Button("Réinitialiser le journal local", role: .destructive) { confirmReset = true }
                     }

@@ -84,7 +84,7 @@ struct VideoPlayerScreen: View {
     }
 }
 
-/// A signed kDrive URL carries no auth header, so the player asset must not need one.
+/// A resolved streaming URL carries no auth header, so the player asset must not need one.
 private struct VideoSurface: UIViewControllerRepresentable {
     let player: AVPlayer
 

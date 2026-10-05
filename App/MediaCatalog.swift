@@ -15,9 +15,9 @@ struct MediaItem: Identifiable {
     let url: URL?
     /// Extra request headers, e.g. a bearer token.
     var headers: [String: String] = [:]
-    /// Resolves `url` to something a player or image loader can stream. Used by kDrive:
-    /// the API call returns a signed, self-authorizing URL and the bytes never pass
-    /// through the app.
+    /// Resolves `url` to something a player or image loader can stream. For sources
+    /// whose URL is short-lived: the resolver returns a fresh, self-authorizing URL and
+    /// the bytes never pass through the app.
     var streamURL: (() async throws -> URL)?
 
     init(id: String, title: String, subtitle: String, kind: MediaKind,
