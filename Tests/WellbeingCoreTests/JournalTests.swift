@@ -127,16 +127,69 @@ final class JournalTests: XCTestCase {
     }
 
     func testCSVExposesEveryMeasure() {
-        let csv = Journal.csv([Session(duration: 12, feeling: 4, orgasm: 5, mental: 2, ejaculation: .baveuse, notes: "Note")])
-        XCTAssertTrue(csv.hasPrefix("date_utc,duree_secondes,ressenti_sur_5,orgasme_sur_5,ressenti_mental_sur_5,type_ejaculation,notes\r\n"))
+        let csv = Journal.csv([Session(duration: 12, feeling: 4, orgasm: 5, mental: 2,
+                                       ejaculation: .baveuse, notes: "Note")])
+        XCTAssertTrue(csv.hasPrefix("date_utc,duree_secondes,ressenti_sur_5,orgasme_sur_5,ressenti_mental_sur_5,type_ejaculation,avec_porno,notes\r\n"))
         let row = csv.components(separatedBy: "\r\n")[1]
-        XCTAssertTrue(row.hasSuffix(",4,5,2,baveuse,\"Note\""))
+        XCTAssertTrue(row.hasSuffix(",4,5,2,baveuse,0,\"Note\""))
     }
 
     func testCSVQuotesNewlinesAndNeutralizesFormulas() {
         let csv = Journal.csv([Session(duration: 12, notes: " =SUM(1,2)\n\"note\"")])
         XCTAssertTrue(csv.contains("\"' =SUM(1,2)\n\"\"note\"\"\""))
-        XCTAssertTrue(csv.hasPrefix("date_utc,duree_secondes,ressenti_sur_5,orgasme_sur_5,ressenti_mental_sur_5,type_ejaculation,notes\r\n"))
+        XCTAssertTrue(csv.hasPrefix("date_utc,duree_secondes,ressenti_sur_5,orgasme_sur_5,ressenti_mental_sur_5,type_ejaculation,avec_porno,notes\r\n"))
+    }
+
+    // MARK: - Porn flag
+
+    /// A journal written before the flag existed has no key at all, and every one of its
+    /// days must count as clean rather than as a relapse.
+    func testASessionWithoutThePornKeyDecodesAsClean() throws {
+        let json = """
+        [{"id":"11111111-1111-1111-1111-111111111111","date":"2024-01-01T10:00:00Z",
+          "duration":60,"feeling":3,"notes":"note"}]
+        """
+        let sessions = try Journal.decode(Data(json.utf8))
+        XCTAssertEqual(sessions.count, 1)
+        XCTAssertFalse(sessions[0].hasPorn)
+    }
+
+    func testASessionWithThePornKeyDecodes() throws {
+        let json = """
+        [{"id":"11111111-1111-1111-1111-111111111111","date":"2024-01-01T10:00:00Z",
+          "duration":60,"feeling":3,"notes":"","hasPorn":true}]
+        """
+        let sessions = try Journal.decode(Data(json.utf8))
+        XCTAssertTrue(sessions[0].hasPorn)
+    }
+
+    /// A hand-edited file can hold the wrong type. The key must be treated as absent
+    /// rather than thrown on, or one bad value costs the user the whole journal.
+    func testAMistypedPornKeyIsTreatedAsClean() throws {
+        let json = """
+        [{"id":"11111111-1111-1111-1111-111111111111","date":"2024-01-01T10:00:00Z",
+          "duration":60,"feeling":3,"notes":"","hasPorn":"oui"}]
+        """
+        let sessions = try Journal.decode(Data(json.utf8))
+        XCTAssertFalse(sessions[0].hasPorn)
+    }
+
+    func testTheCsvCarriesThePornColumn() {
+        let csv = Journal.csv([Session(duration: 60, hasPorn: true)])
+        let lines = csv.split(separator: "\r\n")
+        XCTAssertTrue(lines[0].contains("avec_porno"))
+        XCTAssertTrue(lines[1].contains(",1,"), "valeur attendue dans : \(lines[1])")
+    }
+
+    func testTheCsvColumnIsZeroForACleanSession() {
+        let csv = Journal.csv([Session(duration: 60)])
+        XCTAssertTrue(csv.split(separator: "\r\n")[1].contains(",0,"))
+    }
+
+    func testThePornFlagSurvivesAnEncodeDecodeRoundTrip() throws {
+        let original = [Session(duration: 60, hasPorn: true), Session(duration: 30, hasPorn: false)]
+        let decoded = try Journal.decode(Journal.encode(original))
+        XCTAssertEqual(decoded.map(\.hasPorn), [true, false])
     }
 
     func testTimerResumesAfterSerializationAndExcludesPausedTime() throws {

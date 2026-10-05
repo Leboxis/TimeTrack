@@ -20,11 +20,15 @@ public struct Session: Identifiable, Codable, Equatable {
     public var orgasm: Int
     public var mental: Int
     public var ejaculation: Ejaculation
+    /// Whether this session involved pornography. Absent from journals written before the
+    /// field existed, so it decodes as `false` and those days count as clean.
+    public var hasPorn: Bool
     public var notes: String
 
     public init(id: UUID = UUID(), date: Date = Date(), duration: TimeInterval,
                 feeling: Int = 3, orgasm: Int = 3, mental: Int = 3,
-                ejaculation: Ejaculation = .aucune, notes: String = "") {
+                ejaculation: Ejaculation = .aucune, hasPorn: Bool = false,
+                notes: String = "") {
         self.id = id
         self.date = date
         self.duration = duration
@@ -32,6 +36,7 @@ public struct Session: Identifiable, Codable, Equatable {
         self.orgasm = orgasm
         self.mental = mental
         self.ejaculation = ejaculation
+        self.hasPorn = hasPorn
         self.notes = notes
     }
 
@@ -46,6 +51,9 @@ public struct Session: Identifiable, Codable, Equatable {
         orgasm = try container.decodeIfPresent(Int.self, forKey: .orgasm) ?? 3
         mental = try container.decodeIfPresent(Int.self, forKey: .mental) ?? 3
         ejaculation = try container.decodeIfPresent(Ejaculation.self, forKey: .ejaculation) ?? .aucune
+        // `decodeIfPresent` also absorbs a wrongly-typed value, which is what keeps a
+        // hand-edited journal decodable instead of failing the whole file.
+        hasPorn = try container.decodeIfPresent(Bool.self, forKey: .hasPorn) ?? false
         notes = try container.decode(String.self, forKey: .notes)
     }
 
@@ -118,9 +126,10 @@ public enum Journal {
             [formatter.string(from: session.date), String(session.duration),
              String(session.feeling), String(session.orgasm), String(session.mental),
              session.ejaculation.rawValue,
+             session.hasPorn ? "1" : "0",
              safeCSVField(session.notes)].joined(separator: ",")
         }
-        return "date_utc,duree_secondes,ressenti_sur_5,orgasme_sur_5,ressenti_mental_sur_5,type_ejaculation,notes\r\n" + rows.joined(separator: "\r\n")
+        return "date_utc,duree_secondes,ressenti_sur_5,orgasme_sur_5,ressenti_mental_sur_5,type_ejaculation,avec_porno,notes\r\n" + rows.joined(separator: "\r\n")
     }
 
     private static func safeCSVField(_ text: String) -> String {
@@ -147,7 +156,7 @@ public struct TimerDraft: Codable, Equatable {
     }
 }
 
-/// The five bands a 1-5 rating falls into.
+/// /// The five bands a 1-5 rating falls into.
 ///
 /// Deliberately free of SwiftUI: the clamping rule is the part worth testing, and it
 /// lives in the package where `swift test` can reach it. The colour itself belongs to
