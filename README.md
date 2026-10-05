@@ -11,6 +11,7 @@ Application native **SwiftUI**, en français, pour iPhone et iPad sous **iOS 17 
 - Graphiques des durées et du ressenti sur 7 jours, 30 jours ou toute la période.
 - Graphiques interactifs : toucher ou glisser pour sélectionner une séance, repères synchronisés, fiche détaillée et modification directe. Navigation précédente/suivante pour parcourir tous les points, y compris les séances à la même heure.
 - Export CSV compatible avec les tableurs et suppression complète sur confirmation.
+- Suivi des jours sans porno : série, record et taux de jours propres, calculés depuis les séances cochées « avec porno » dans l'éditeur.
 - Stockage local, protection de fichier iOS et écran masqué lorsque l’app est inactive.
 - Interface adaptative, mode sombre système et contrôles SwiftUI accessibles.
 

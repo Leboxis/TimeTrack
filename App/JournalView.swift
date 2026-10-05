@@ -61,6 +61,11 @@ struct JournalView: View {
                                 chip("Orgasme \(session.orgasm)/5", RatingPalette.orgasm)
                                 chip("Mental \(session.mental)/5", RatingPalette.mental)
                                 chip(session.ejaculation.label, RatingPalette.ejaculation)
+                                // Only shown when true: a chip reading "Porno" on every row
+                                // would train the eye to skip it.
+                                if session.hasPorn {
+                                    chip("Porno", RatingPalette.ejaculation)
+                                }
                             }
                             if !session.notes.isEmpty {
                                 Text(session.notes).font(.subheadline).foregroundStyle(.secondary).lineLimit(2)
@@ -141,6 +146,7 @@ struct JournalView: View {
             "orgasme \(session.orgasm) sur 5",
             "ressenti mental \(session.mental) sur 5",
             "type d'éjaculation : \(session.ejaculation.label)",
+            session.hasPorn ? "avec porno" : "sans porno",
         ]
         if !session.notes.isEmpty { parts.append(session.notes) }
         return parts.joined(separator: ", ")

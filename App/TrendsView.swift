@@ -25,6 +25,12 @@ struct TrendsView: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 24) {
+                    // Above the picker and outside the `sessions.isEmpty` branch below: the
+                    // streak is an absolute figure, and it must not vanish because the
+                    // period happens to be empty.
+                    if !store.loadFailed {
+                        AbstinenceCard(sessions: store.sessions)
+                    }
                     Picker("Période", selection: $days) {
                         Text("7 jours").tag(7)
                         Text("30 jours").tag(30)

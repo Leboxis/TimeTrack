@@ -45,6 +45,9 @@ struct SessionEditor: View {
                     } else {
                         Text("Saisissez une durée entre 1 seconde et 24 heures.").font(.caption).foregroundStyle(.red)
                     }
+                    // Named after the content of the session, not after the user: this
+                    // describes what happened, and it is what the day counters read.
+                    Toggle("Séance avec porno", isOn: $session.hasPorn)
                 }
                 Section {
                     RatingRow(title: "Ressenti", labels: Self.feelingLabels, value: $session.feeling)
