@@ -51,9 +51,10 @@ public struct Session: Identifiable, Codable, Equatable {
         orgasm = try container.decodeIfPresent(Int.self, forKey: .orgasm) ?? 3
         mental = try container.decodeIfPresent(Int.self, forKey: .mental) ?? 3
         ejaculation = try container.decodeIfPresent(Ejaculation.self, forKey: .ejaculation) ?? .aucune
-        // `decodeIfPresent` also absorbs a wrongly-typed value, which is what keeps a
-        // hand-edited journal decodable instead of failing the whole file.
-        hasPorn = try container.decodeIfPresent(Bool.self, forKey: .hasPorn) ?? false
+        // `try?` around `decodeIfPresent`, because `decodeIfPresent` alone only tolerates a
+        // *missing* key: a hand-edited `"hasPorn": "oui"` throws `typeMismatch`, which
+        // would fail the whole journal and cost the user every session in it.
+        hasPorn = (try? container.decodeIfPresent(Bool.self, forKey: .hasPorn)) ?? false
         notes = try container.decode(String.self, forKey: .notes)
     }
 

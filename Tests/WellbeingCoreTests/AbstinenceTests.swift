@@ -50,10 +50,11 @@ final class AbstinenceTests: XCTestCase {
     }
 
     func testTheLongestStreakSurvivesALaterRelapse() {
+        // Dirty on day -6 and today, so the run in between is days -5 through -1.
         let result = abstinence(sessions: [day(-6, hasPorn: true), day(0, hasPorn: true)],
                                 now: epoch, calendar: calendar)
         XCTAssertEqual(result.days, 0)
-        XCTAssertEqual(result.longest, 6)
+        XCTAssertEqual(result.longest, 5)
     }
 
     /// Three porn sessions on one day are one failure, not three.
